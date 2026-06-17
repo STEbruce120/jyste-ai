@@ -1326,12 +1326,14 @@ function setAwakeMode(awake){
     document.getElementById('voice-ctrl-btn').style.borderColor='#22c55e';
     document.getElementById('voice-ctrl-btn').style.color='#22c55e';
     document.getElementById('voice-ctrl-status').textContent='小秘已喚醒 請說指令 說「再見」結束對話';
-    // 重置30秒休眠計時
+    // 沒有任務進行中才啟動計時；有任務時等任務完成後再計時
     if(sleepTimeout)clearTimeout(sleepTimeout);
-    sleepTimeout=setTimeout(()=>{
-      setAwakeMode(false);
-      speakFeedback('我先休息一下 需要的時候叫我');
-    },30000);
+    if(!isProcessing){
+      sleepTimeout=setTimeout(()=>{
+        setAwakeMode(false);
+        speakFeedback('我先休息一下 需要的時候叫我');
+      },30000);
+    }
   }else{
     // 待機狀態：藍色
     document.getElementById('voice-ctrl-btn').style.background='#1e3a5f';
@@ -1563,12 +1565,18 @@ function speakFeedback(text){
 
   utter.onend=()=>{
     isProcessing=false;
-    // 說完後恢復監聽：直接 start 同一個物件，不重建，不觸發新的權限要求
+    // 任務完成後才重新開始 30 秒待命倒數
+    if(isAwake&&voiceCtrlActive){
+      if(sleepTimeout)clearTimeout(sleepTimeout);
+      sleepTimeout=setTimeout(()=>{
+        setAwakeMode(false);
+        speakFeedback('我先休息一下 需要的時候叫我');
+      },30000);
+    }
+    // 說完後恢復監聽
     if(voiceCtrlActive&&voiceCtrlRecognition){
       setTimeout(()=>{
-        try{voiceCtrlRecognition.start();}catch(e){
-          // 如果 start 失敗（物件已廢棄），靜默忽略，等 onend 自動重啟
-        }
+        try{voiceCtrlRecognition.start();}catch(e){}
       },400);
     }
   };
@@ -1681,12 +1689,9 @@ function setupRecognitionHandlers(){
       }
       if(transcript.length>1){
         isProcessing=true;
+        if(sleepTimeout)clearTimeout(sleepTimeout); // 暫停計時，等任務完成後由 speakFeedback 重啟
+        sleepTimeout=null;
         executeVoiceCommand(transcript);
-        if(sleepTimeout)clearTimeout(sleepTimeout);
-        sleepTimeout=setTimeout(()=>{
-          setAwakeMode(false);
-          speakFeedback('bruce哥 我先待機 需要叫我');
-        },30000);
       }
     }
   };
