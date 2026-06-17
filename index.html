@@ -174,6 +174,31 @@ input:focus { outline: none; border-color: var(--info) !important; }
 .rec-hint { font-size: 12px; color: var(--text2); margin-top: 3px; }
 .divider { display: flex; align-items: center; gap: 8px; margin: 12px 0; color: var(--text2); font-size: 12px; }
 .divider::before,.divider::after { content:''; flex:1; height:1px; background:var(--border); }
+
+/* ── 快速指令輸入框 ─────────────────────────── */
+.cmd-bar{display:flex;gap:8px;padding:12px 14px;background:linear-gradient(135deg,var(--bg2),var(--bg3));border:1px solid var(--info-border);border-radius:var(--radius);margin-bottom:1rem;align-items:center}
+.cmd-input-wrap{flex:1;position:relative}
+.cmd-input-wrap i{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--text2);font-size:16px;pointer-events:none}
+.cmd-input{width:100%;padding:9px 12px 9px 38px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg);color:var(--text);font-size:14px}
+.cmd-input:focus{outline:none;border-color:var(--info)}
+.cmd-result{font-size:13px;padding:8px 12px;background:var(--success-bg);border:1px solid var(--success-border);color:var(--success);border-radius:var(--radius-sm);margin-bottom:10px;display:none;line-height:1.6}
+.cmd-result.warn{background:var(--warning-bg);border-color:var(--warning-border);color:var(--warning)}
+/* ── 智慧對話 (浮動) ─────────────────────────── */
+.chat-fab{position:fixed;bottom:24px;right:24px;width:52px;height:52px;border-radius:50%;background:var(--info);border:none;cursor:pointer;font-size:22px;color:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 16px rgba(59,130,246,0.5);z-index:90;transition:all 0.2s;padding:0}
+.chat-fab:hover{transform:scale(1.08)}
+.chat-panel{position:fixed;bottom:88px;right:20px;width:320px;max-width:calc(100vw - 40px);background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 8px 32px rgba(0,0,0,0.5);z-index:90;display:none;flex-direction:column}
+.chat-panel.open{display:flex}
+.chat-header{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--border)}
+.chat-title{font-size:14px;font-weight:500;display:flex;align-items:center;gap:8px}
+.chat-msgs{min-height:180px;max-height:260px;overflow-y:auto;padding:10px;display:flex;flex-direction:column;gap:8px}
+.chat-msg{max-width:88%;padding:8px 12px;border-radius:10px;font-size:13px;line-height:1.6;white-space:pre-wrap}
+.chat-msg.ai{background:var(--bg3);color:var(--text);align-self:flex-start}
+.chat-msg.user{background:var(--info-bg);color:#93c5fd;align-self:flex-end;border:1px solid var(--info-border)}
+.chat-input-row{display:flex;gap:8px;padding:10px;border-top:1px solid var(--border)}
+.chat-text-input{flex:1;padding:7px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg3);color:var(--text);font-size:13px}
+.chat-text-input:focus{outline:none;border-color:var(--info)}
+/* ── 每日工作回顧 ─────────────────────────────── */
+.review-result{font-size:13px;line-height:1.9;white-space:pre-wrap;color:var(--text);margin-top:12px;padding:12px;background:var(--bg3);border-radius:var(--radius-sm);border-left:3px solid var(--purple);display:none}
 </style>
 </head>
 <body>
@@ -193,7 +218,20 @@ input:focus { outline: none; border-color: var(--info) !important; }
       </button>
       <button onclick="changeApiKey()" style="padding:4px 10px;font-size:12px;color:var(--text2)"><i class="ti ti-refresh"></i> 更換Key</button>
     </div>
+
+  <!-- ② 快速指令輸入框 -->
+  <div class="cmd-bar">
+    <div class="cmd-input-wrap">
+      <i class="ti ti-terminal"></i>
+      <input class="cmd-input" type="text" id="cmd-input"
+             placeholder="直接輸入指令... 例如：新增明天跟客戶開會、今天最重要的事是什麼"
+             onkeydown="if(event.key==='Enter')processQuickCmd()"/>
+    </div>
+    <button class="btn-primary" onclick="processQuickCmd()" id="cmd-btn" style="white-space:nowrap;flex-shrink:0">
+      <i class="ti ti-sparkles"></i> AI執行
+    </button>
   </div>
+  <div id="cmd-result" class="cmd-result"></div>
 
   <!-- API Key 設定 -->
   <div class="setup-card" id="setup-card" style="display:none">
@@ -275,6 +313,21 @@ input:focus { outline: none; border-color: var(--info) !important; }
       <div id="news-container">
         <div class="empty"><i class="ti ti-news"></i>點擊「載入今日新聞」取得最新資訊</div>
       </div>
+    </div>
+
+    <!-- ③ 每日工作回顧 -->
+    <div class="card">
+      <div class="card-title">
+        <div class="card-title-left"><i class="ti ti-chart-bar" style="color:var(--purple)"></i> 今日工作回顧</div>
+        <button class="btn-primary" onclick="generateWorkReview()" id="review-btn">
+          <i class="ti ti-sparkles"></i> AI 生成回顧
+        </button>
+      </div>
+      <div style="font-size:13px;color:var(--text2);line-height:1.6">AI 秘書分析今天工作進度，告訴你完成了什麼、明天該優先做什麼</div>
+      <div id="review-loading" class="loading-box" style="display:none">
+        <i class="ti ti-loader-2 spin" style="font-size:24px;display:block;margin-bottom:8px"></i>AI 分析中...
+      </div>
+      <div id="review-result" class="review-result"></div>
     </div>
   </div>
 
@@ -367,6 +420,29 @@ input:focus { outline: none; border-color: var(--info) !important; }
       <button class="icon-btn" onclick="closeModal()"><i class="ti ti-x"></i></button>
     </div>
     <div id="modal-body" style="font-size:14px;line-height:1.8;white-space:pre-wrap"></div>
+  </div>
+</div>
+
+
+<!-- ④ 智慧對話浮動按鈕 -->
+<button class="chat-fab" onclick="toggleChat()" title="刀疤 AI 助理">
+  <i class="ti ti-message-chatbot" id="chat-fab-icon"></i>
+</button>
+
+<div class="chat-panel" id="chat-panel">
+  <div class="chat-header">
+    <div class="chat-title"><i class="ti ti-robot" style="color:var(--info)"></i> 刀疤 AI 助理</div>
+    <button class="icon-btn" onclick="toggleChat()"><i class="ti ti-x"></i></button>
+  </div>
+  <div class="chat-msgs" id="chat-msgs">
+    <div class="chat-msg ai">bruce哥好！我是刀疤 😊 有任何問題都可以問我，例如「今天最重要的事是什麼」、「這週進度如何」</div>
+  </div>
+  <div class="chat-input-row">
+    <input class="chat-text-input" type="text" id="chat-text-input"
+           placeholder="問刀疤任何問題..." onkeydown="if(event.key==='Enter')sendChat()"/>
+    <button class="btn-primary" onclick="sendChat()" style="padding:7px 12px;flex-shrink:0">
+      <i class="ti ti-send"></i>
+    </button>
   </div>
 </div>
 
@@ -959,6 +1035,7 @@ function renderTodos(){
         </div>
       </div>
       <div style="display:flex;gap:4px">
+        ${isMeetingTodo(t.text)?`<button class="icon-btn" onclick="generateMeetingPrep(${t.id})" title="⑤ 會議準備清單" style="color:var(--purple)"><i class="ti ti-clipboard-list"></i></button>`:''}
         <button class="icon-btn" onclick="downloadICS(${t.id})" title="加入Outlook"><i class="ti ti-calendar-plus"></i></button>
         <button class="icon-btn del" onclick="deleteTodo(${t.id})"><i class="ti ti-trash"></i></button>
       </div>
@@ -1635,6 +1712,197 @@ function setupRecognitionHandlers(){
 function showToast(msg){
   const t=document.getElementById('toast');t.textContent=msg;t.style.display='block';
   setTimeout(()=>t.style.display='none',2800);
+}
+
+
+// ── ② 快速指令輸入框 ──────────────────────────────
+async function processQuickCmd(){
+  const input=document.getElementById('cmd-input').value.trim();
+  if(!input){showToast('請輸入指令');return;}
+  const btn=document.getElementById('cmd-btn');
+  btn.disabled=true;
+  btn.innerHTML='<i class="ti ti-loader-2 spin"></i> 處理中';
+  const todayStr=new Date().toISOString().slice(0,10);
+  try{
+    const res=await callGemini(`你是鈞曜科技AI秘書「刀疤」。今天日期：${todayStr}。
+
+用戶輸入：「${input}」
+
+請分析意圖，只回傳JSON（不要任何Markdown包裝）：
+{"action":"add_todo|show_todos|load_news|briefing|meeting|history|work_review|ai_answer","todo_text":"待辦文字或空","todo_date":"YYYY-MM-DD或空","todo_person":"負責人或空","answer":"如果是問答填這裡否則空"}
+
+行動說明：add_todo=新增待辦, show_todos=看待辦, load_news=看新聞, briefing=播報晨報, meeting=會議記錄頁, history=歷史記錄, work_review=今日工作回顧, ai_answer=回答問題`);
+    let parsed;
+    try{parsed=JSON.parse(res.replace(/```json|```/g,'').trim());}
+    catch(e){parsed={action:'ai_answer',answer:res};}
+    document.getElementById('cmd-input').value='';
+    switch(parsed.action){
+      case 'add_todo':
+        if(parsed.todo_text){
+          const todo={id:Date.now(),text:parsed.todo_text,person:parsed.todo_person||'',date:parsed.todo_date||'',time:'',done:false};
+          todos.push(todo);
+          sbInsert('todos',todo).catch(()=>{});
+          saveData();renderTodos();updateMorningStats();checkReminders();
+          showCmdResult('✅ 已新增待辦：'+parsed.todo_text+(parsed.todo_date?' ('+parsed.todo_date+')':''));
+        }
+        break;
+      case 'show_todos': switchTab('todo'); break;
+      case 'load_news': switchTab('morning');setTimeout(loadNews,200); break;
+      case 'briefing': switchTab('morning');setTimeout(startSpeak,200); break;
+      case 'meeting': switchTab('meeting'); break;
+      case 'history': switchTab('history'); break;
+      case 'work_review': switchTab('morning');setTimeout(generateWorkReview,300); break;
+      case 'ai_answer': showCmdResult(parsed.answer||res); break;
+    }
+  }catch(e){
+    showCmdResult('⚠️ 處理失敗：'+e.message,true);
+  }
+  btn.disabled=false;
+  btn.innerHTML='<i class="ti ti-sparkles"></i> AI執行';
+}
+
+function showCmdResult(msg,isWarn){
+  const el=document.getElementById('cmd-result');
+  el.textContent=msg;
+  el.className='cmd-result'+(isWarn?' warn':'');
+  el.style.display='block';
+  setTimeout(()=>el.style.display='none',7000);
+}
+
+// ── ③ 每日工作回顧 ────────────────────────────────
+async function generateWorkReview(){
+  if(!apiKey){showToast('請先設定 API Key');return;}
+  const btn=document.getElementById('review-btn');
+  btn.disabled=true;
+  document.getElementById('review-loading').style.display='block';
+  document.getElementById('review-result').style.display='none';
+  const completed=todos.filter(t=>t.done);
+  const pending=todos.filter(t=>!t.done);
+  const urgent=todos.filter(t=>{if(t.done||!t.date)return false;const d=daysUntil(t.date);return d!==null&&d<=3&&d>=0;});
+  const overdue=todos.filter(t=>{if(t.done||!t.date)return false;return daysUntil(t.date)<0;});
+  const todayLocal=new Date().toLocaleDateString('zh-TW');
+  const todayMeetings=meetings.filter(m=>m.date===todayLocal);
+  const prompt=`你是鈞曜科技（物料管理設備製造商，產品：垂直式/旋轉式自動倉儲）總經理bruce哥的AI秘書「刀疤」。請根據以下資料生成今日工作回顧，繁體中文，語氣親切、重點明確：
+
+【今日資料】
+已完成待辦（${completed.length}件）：${completed.slice(-5).map(t=>t.text).join('、')||'無'}
+未完成待辦（${pending.length}件）：${pending.slice(0,5).map(t=>t.text+(t.date?' ('+t.date+')':'')).join('、')||'無'}
+即將到期（${urgent.length}件）：${urgent.map(t=>t.text).join('、')||'無'}
+已逾期（${overdue.length}件）：${overdue.map(t=>t.text).join('、')||'無'}
+今日會議記錄：${todayMeetings.length}筆
+
+請生成：
+【今日工作亮點】
+說明今天完成了哪些事，給予適度肯定。
+
+【明日優先重點】
+列出明天最優先應處理的事項（依緊急程度排序，最多3項）。
+
+【刀疤的建議】
+給bruce哥1~2條具體可行的行動建議。`;
+  try{
+    const res=await callGemini(prompt);
+    document.getElementById('review-result').textContent=res;
+    document.getElementById('review-result').style.display='block';
+  }catch(e){
+    document.getElementById('review-result').textContent='⚠️ 生成失敗：'+e.message;
+    document.getElementById('review-result').style.display='block';
+  }
+  document.getElementById('review-loading').style.display='none';
+  btn.disabled=false;
+}
+
+// ── ④ 智慧對話 ────────────────────────────────────
+let chatOpen=false;
+let chatHistory=[];
+
+function toggleChat(){
+  chatOpen=!chatOpen;
+  document.getElementById('chat-panel').className='chat-panel'+(chatOpen?' open':'');
+  document.getElementById('chat-fab-icon').className=chatOpen?'ti ti-x':'ti ti-message-chatbot';
+  if(chatOpen)document.getElementById('chat-text-input').focus();
+}
+
+async function sendChat(){
+  if(!apiKey){showToast('請先設定 API Key');return;}
+  const input=document.getElementById('chat-text-input');
+  const msg=input.value.trim();
+  if(!msg)return;
+  input.value='';
+  addChatBubble(msg,'user');
+  const pending=todos.filter(t=>!t.done);
+  const urgent=todos.filter(t=>{if(t.done||!t.date)return false;const d=daysUntil(t.date);return d!==null&&d<=3;});
+  const context=`目前待辦（${pending.length}件）：${pending.slice(0,5).map(t=>t.text+(t.date?' (到期:'+t.date+')':'')).join('、')||'無'}
+即將到期（${urgent.length}件）：${urgent.map(t=>t.text).join('、')||'無'}
+會議記錄總數：${meetings.length}筆`;
+  const loadEl=addChatBubble('思考中...','ai');
+  try{
+    chatHistory.push({role:'user',content:msg});
+    const sysMsg=`你是鈞曜科技總經理bruce哥的AI秘書「刀疤」，親切專業。工作狀況：\n${context}\n\n請回答bruce哥的問題，繁體中文，100字以內，直接給有用答案。`;
+    const res=await fetch('https://api.groq.com/openai/v1/chat/completions',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+apiKey},
+      body:JSON.stringify({model:'llama-3.3-70b-versatile',messages:[{role:'user',content:sysMsg+'\n\n問題：'+msg}],max_tokens:300})
+    });
+    if(!res.ok)throw new Error('API錯誤');
+    const data=await res.json();
+    const answer=data.choices?.[0]?.message?.content||'';
+    chatHistory.push({role:'assistant',content:answer});
+    loadEl.textContent=answer;
+  }catch(e){
+    loadEl.textContent='⚠️ 回覆失敗，請稍後再試';
+  }
+}
+
+function addChatBubble(text,role){
+  const msgs=document.getElementById('chat-msgs');
+  const el=document.createElement('div');
+  el.className='chat-msg '+role;
+  el.textContent=text;
+  msgs.appendChild(el);
+  msgs.scrollTop=msgs.scrollHeight;
+  return el;
+}
+
+// ── ⑤ 會議前準備提醒 ──────────────────────────────
+const MEETING_KEYWORDS=['開會','會議','拜訪','客戶','簡報','報告','面試','談判','討論','簽約'];
+
+function isMeetingTodo(text){
+  return MEETING_KEYWORDS.some(k=>text.includes(k));
+}
+
+async function generateMeetingPrep(todoId){
+  if(!apiKey){showToast('請先設定 API Key');return;}
+  const todo=todos.find(t=>t.id==todoId);
+  if(!todo)return;
+  document.getElementById('modal-title').textContent='📋 會議準備清單：'+todo.text;
+  document.getElementById('modal-body').innerHTML='<div style="text-align:center;padding:1.5rem"><i class="ti ti-loader-2 spin" style="font-size:28px"></i><div style="margin-top:8px;color:var(--text2)">AI 生成準備清單中...</div></div>';
+  document.getElementById('history-modal').classList.add('open');
+  const prompt=`你是鈞曜科技（物料管理設備製造商，產品：垂直式/旋轉式自動倉儲）總經理bruce哥的AI秘書「刀疤」。
+
+即將舉行的會議：${todo.text}
+${todo.date?'日期：'+todo.date:''}
+${todo.person?'負責人：'+todo.person:''}
+
+請生成會議前準備清單：
+
+【需要準備的資料】
+（文件、報價單、樣品、簡報等具體物品）
+
+【開會前確認事項】
+（場地、設備、出席人員等）
+
+【預計討論重點】
+（根據會議主題推測的重要議題）
+
+【刀疤的提醒】
+（一句實用的關鍵提示）`;
+  try{
+    const res=await callGemini(prompt);
+    document.getElementById('modal-body').innerHTML='<div style="font-size:14px;line-height:1.8;white-space:pre-wrap">'+res+'</div>';
+  }catch(e){
+    document.getElementById('modal-body').textContent='⚠️ 生成失敗：'+e.message;
+  }
 }
 
 init();
