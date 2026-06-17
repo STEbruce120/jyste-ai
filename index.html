@@ -1417,9 +1417,10 @@ function parseVoiceDate(text){
     const target=weekdays.indexOf(day);
     if(target>=0){
       const d=new Date(now);
-      let diff=(target-now.getDay()+7)%7||7;
-      if(diff<=0)diff+=7;
-      d.setDate(d.getDate()+diff+7);
+      const today=now.getDay();
+      const daysToNextMonday=((8-today)%7)||7;
+      const offsetFromMonday=target===0?6:target-1;
+      d.setDate(d.getDate()+daysToNextMonday+offsetFromMonday);
       return fmt(d);
     }
   }
