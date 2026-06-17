@@ -1665,17 +1665,21 @@ function setupRecognitionHandlers(){
           sbInsert('todos',todo).catch(()=>{});
           saveData();renderTodos();updateMorningStats();checkReminders();
           const addedText=todo.text;
+          const addedDate=todo.date;
           voicePendingConfirm=null;
           voicePendingAdd=false;
-          isProcessing=false;
           showToast(`✅ 已新增待辦：${addedText}`);
           document.getElementById('voice-ctrl-status').textContent=`✅ 已新增：${addedText} 請說下一個指令`;
           document.getElementById('voice-ctrl-result').textContent='';
+          // 語音確認：告訴 bruce 哥已成功新增
+          speakFeedback('好的 已加入待辦清單');
         }else if(isCancel){
           clearVoicePending();
           showToast('已取消');
           document.getElementById('voice-ctrl-status').textContent='刀疤已喚醒 請說指令 說「再見」結束對話';
           document.getElementById('voice-ctrl-result').textContent='';
+          // 語音確認：告訴 bruce 哥已取消
+          speakFeedback('好的 已取消');
         }else{
           document.getElementById('voice-ctrl-status').textContent=`待確認：${voicePendingConfirm.text} | 說「確認」或「取消」`;
         }
