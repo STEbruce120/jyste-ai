@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>鈞曜科技 AI 秘書 v3.7</title>
+<title>鈞曜科技 AI 秘書 v3.8</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <style>
 :root {
@@ -209,7 +209,7 @@ input:focus { outline: none; border-color: var(--info) !important; }
     <div class="logo"><i class="ti ti-robot"></i></div>
     <div class="header-text">
       <h1>鈞曜科技 AI 秘書</h1>
-      <p>會議記錄 ・ 待辦追蹤 ・ 每日晨報 ・ Outlook &nbsp;<span style="font-size:11px;background:#22c55e22;color:#22c55e;border:1px solid #22c55e44;border-radius:20px;padding:1px 8px;vertical-align:middle">v3.7</span></p>
+      <p>會議記錄 ・ 待辦追蹤 ・ 每日晨報 ・ Outlook &nbsp;<span style="font-size:11px;background:#22c55e22;color:#22c55e;border:1px solid #22c55e44;border-radius:20px;padding:1px 8px;vertical-align:middle">v3.8</span></p>
     </div>
     <div class="header-right" style="display:flex;gap:8px;align-items:center">
       <div class="api-status ok" id="api-status"><i class="ti ti-check"></i> AI 已連線</div>
@@ -508,6 +508,7 @@ let todos=[], meetings=[], currentFilter='all', lastExtractedTodos=[], apiKey=lo
 let _voiceNewsItems=[];  // 儲存最近載入的新聞，供語音分析使用
 let _lastSpokenText='';  // 記住最後一句話，供「重複」指令使用
 let _completedToday=[];  // 本次開啟後完成的待辦，供晚間簡報使用
+let isTTSSpeaking=false; // TTS 播報期間為 true，防止辨識在段落空隙誤收自己的聲音
 const STORAGE_KEY_TODOS='jyste_todos_v3', STORAGE_KEY_MEETINGS='jyste_meetings_v3', STORAGE_KEY_API='jyste_groq_key';
 const weekdays=['日','一','二','三','四','五','六'];
 
@@ -1429,6 +1430,7 @@ async function startSpeak(){
   document.getElementById('speak-text').style.display='block';
   document.getElementById('speak-text').textContent=text;
   isSpeaking=true;
+  isTTSSpeaking=true; // 每日簡報播報期間封鎖 recognition.onend
   document.getElementById('speak-btn').style.background='#ef4444';
   document.getElementById('speak-btn').innerHTML='<i class="ti ti-player-pause"></i> 播報中';
 
@@ -1462,6 +1464,8 @@ async function startSpeak(){
       document.getElementById('speak-btn').style.background='#22c55e';
       document.getElementById('speak-btn').innerHTML='<i class="ti ti-player-play"></i> 播報';
       // 每日簡報播完後重置語音控制狀態
+      isSpeaking=false;
+      isTTSSpeaking=false; // 解除封鎖
       if(_processingGuard){clearTimeout(_processingGuard);_processingGuard=null;}
       isProcessing=false;
       if(isAwake&&voiceCtrlActive){
@@ -1493,6 +1497,7 @@ function stopSpeak(){
   window.speechSynthesis.cancel();
   if(currentAudio){currentAudio.pause();currentAudio=null;}
   isSpeaking=false;
+  isTTSSpeaking=false; // 停止播報，解除封鎖
   document.getElementById('speak-btn').style.background='#22c55e';
   document.getElementById('speak-btn').innerHTML='<i class="ti ti-player-play"></i> 播報';
 }
@@ -1931,6 +1936,7 @@ function preprocessTTS(text){
 
 function speakFeedback(text){
   _lastSpokenText=text; // 記錄，供「重複」指令使用
+  isTTSSpeaking=true;   // 播報期間禁止 recognition.onend 重啟辨識
 
   // ★ 關鍵：開始說話前先清除休眠計時器，避免長文字朗讀途中被打斷
   if(sleepTimeout){clearTimeout(sleepTimeout);sleepTimeout=null;}
@@ -1953,6 +1959,7 @@ function speakFeedback(text){
   //    長文字請改用 speakChain()，避免 pause/resume 觸發假 onend 導致誤計 sleepTimeout
 
   utter.onend=()=>{
+    isTTSSpeaking=false; // 播報結束，解除封鎖
     if(_processingGuard){clearTimeout(_processingGuard);_processingGuard=null;}
     isProcessing=false;
     if(isAwake&&voiceCtrlActive){
@@ -1976,6 +1983,7 @@ function speakFeedback(text){
 // 每段都很短，不需要 keepAlive，也不會有假 onend 問題
 function speakChain(text){
   _lastSpokenText=text;
+  isTTSSpeaking=true;  // 整段接力播報期間封鎖 recognition.onend
   if(sleepTimeout){clearTimeout(sleepTimeout);sleepTimeout=null;}
   if(voiceCtrlRecognition&&voiceCtrlActive){try{voiceCtrlRecognition.stop();}catch(e){}}
   window.speechSynthesis.cancel();
@@ -2034,6 +2042,7 @@ function speakChain(text){
 }
 // speakChain 全部播完後的收尾（恢復辨識、設定 sleepTimeout）
 function _voiceChainDone(){
+  isTTSSpeaking=false; // 接力播報全部結束，解除封鎖
   if(_processingGuard){clearTimeout(_processingGuard);_processingGuard=null;}
   isProcessing=false;
   if(isAwake&&voiceCtrlActive){
@@ -2173,8 +2182,8 @@ function setupRecognitionHandlers(){
   };
 
   voiceCtrlRecognition.onend=()=>{
-    // 只在沒有語音播報時重啟監聽
-    if(voiceCtrlActive&&!window.speechSynthesis.speaking&&!isSpeaking){
+    // isTTSSpeaking 為 true 代表系統正在朗讀（含段落空隙），禁止重啟
+    if(voiceCtrlActive&&!window.speechSynthesis.speaking&&!isSpeaking&&!isTTSSpeaking){
       setTimeout(()=>{
         try{if(voiceCtrlActive)voiceCtrlRecognition.start();}catch(e){}
       },300);
