@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>鈞曜科技 AI 秘書 v3.5</title>
+<title>鈞曜科技 AI 秘書 v3.6</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <style>
 :root {
@@ -209,7 +209,7 @@ input:focus { outline: none; border-color: var(--info) !important; }
     <div class="logo"><i class="ti ti-robot"></i></div>
     <div class="header-text">
       <h1>鈞曜科技 AI 秘書</h1>
-      <p>會議記錄 ・ 待辦追蹤 ・ 每日晨報 ・ Outlook &nbsp;<span style="font-size:11px;background:#22c55e22;color:#22c55e;border:1px solid #22c55e44;border-radius:20px;padding:1px 8px;vertical-align:middle">v3.5</span></p>
+      <p>會議記錄 ・ 待辦追蹤 ・ 每日晨報 ・ Outlook &nbsp;<span style="font-size:11px;background:#22c55e22;color:#22c55e;border:1px solid #22c55e44;border-radius:20px;padding:1px 8px;vertical-align:middle">v3.6</span></p>
     </div>
     <div class="header-right" style="display:flex;gap:8px;align-items:center">
       <div class="api-status ok" id="api-status"><i class="ti ti-check"></i> AI 已連線</div>
@@ -1917,6 +1917,8 @@ function preprocessTTS(text){
     const t=Math.floor(n/10),o=n%10;
     return d[t]+'十'+(o?d[o]:'');
   }
+  // 百分比先轉「百分之X」，避免 % 符號被 TTS 靜默略過
+  text=text.replace(/(\d+(\.\d+)?)%/g,'百分之$1');
   text=text.replace(/\d+/g,m=>numToChinese(parseInt(m)));
   // 「二件/個/天/次/位」→「兩件/個/天/次/位」（較自然）
   text=text.replace(/二(件|個|天|次|位|人|份|種)/g,'兩$1');
@@ -1980,20 +1982,36 @@ function speakChain(text){
 
   // 先做 TTS 預處理，再依句末符號切分
   const processed=preprocessTTS(text);
-  const raw=processed
-    .replace(/([。！？])/g,'$1|')
-    .split('|')
-    .map(s=>s.trim())
-    .filter(s=>s.length>0);
 
-  // 合併太短的片段，目標每段 30-45 字（約4-6秒）
-  const chunks=[];
-  let buf='';
-  for(const s of raw){
-    buf+=s;
-    if(buf.length>=35){chunks.push(buf);buf='';}
+  // 以句末符號切分（保留符號），每句獨立，避免跨句合併造成語氣不順
+  const sentences=[];
+  let cur='';
+  for(let i=0;i<processed.length;i++){
+    cur+=processed[i];
+    if('。！？'.includes(processed[i])){
+      const s=cur.trim();
+      if(s)sentences.push(s);
+      cur='';
+    }
   }
-  if(buf)chunks.push(buf);
+  if(cur.trim())sentences.push(cur.trim()); // 最後沒有句號的片段
+
+  // 每句若超過 45 字再依逗號細切（約4-6秒），短句直接播
+  const chunks=[];
+  for(const s of sentences){
+    if(s.length<=45){
+      chunks.push(s);
+    }else{
+      // 依逗號切，合併到接近 40 字
+      const parts=s.replace(/([，,；;])/g,'$1|').split('|').map(p=>p.trim()).filter(p=>p);
+      let buf='';
+      for(const p of parts){
+        if((buf+p).length>40&&buf){chunks.push(buf);buf=p;}
+        else buf+=p;
+      }
+      if(buf)chunks.push(buf);
+    }
+  }
   if(chunks.length===0){_voiceChainDone();return;}
 
   let idx=0;
