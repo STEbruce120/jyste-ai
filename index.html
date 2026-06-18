@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>鈞曜科技 AI 秘書 v2.7</title>
+<title>鈞曜科技 AI 秘書 v2.8</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <style>
 :root {
@@ -209,7 +209,7 @@ input:focus { outline: none; border-color: var(--info) !important; }
     <div class="logo"><i class="ti ti-robot"></i></div>
     <div class="header-text">
       <h1>鈞曜科技 AI 秘書</h1>
-      <p>會議記錄 ・ 待辦追蹤 ・ 每日晨報 ・ Outlook &nbsp;<span style="font-size:11px;background:#22c55e22;color:#22c55e;border:1px solid #22c55e44;border-radius:20px;padding:1px 8px;vertical-align:middle">v2.7</span></p>
+      <p>會議記錄 ・ 待辦追蹤 ・ 每日晨報 ・ Outlook &nbsp;<span style="font-size:11px;background:#22c55e22;color:#22c55e;border:1px solid #22c55e44;border-radius:20px;padding:1px 8px;vertical-align:middle">v2.8</span></p>
     </div>
     <div class="header-right" style="display:flex;gap:8px;align-items:center">
       <div class="api-status ok" id="api-status"><i class="ti ti-check"></i> AI 已連線</div>
@@ -1648,7 +1648,33 @@ function executeVoiceCommand(cmd){
     if(pending.length===0){
       speakFeedback('太棒了 目前沒有待辦 bruce哥可以輕鬆一下');
     }else{
-      speakFeedback('目前還有'+pending.length+'件待辦 已切換到待辦頁面 加油');
+      // 計算三日內的待辦（今天/明天/後天）
+      const todayD=new Date(); todayD.setHours(0,0,0,0);
+      const fmt3=(d)=>{
+        const diff=Math.round((d-todayD)/(86400000));
+        if(diff===0)return'今天';
+        if(diff===1)return'明天';
+        if(diff===2)return'後天';
+        return(d.getMonth()+1)+'月'+d.getDate()+'日';
+      };
+      const upcoming=pending
+        .filter(t=>t.date)
+        .map(t=>({...t,_d:new Date(t.date+'T00:00:00')}))
+        .filter(t=>{ const diff=Math.round((t._d-todayD)/86400000); return diff>=0&&diff<=2; })
+        .sort((a,b)=>a._d-b._d);
+      const noDate=pending.filter(t=>!t.date);
+      if(upcoming.length===0&&noDate.length===0){
+        speakFeedback('目前有'+pending.length+'件待辦 但三日內沒有指定日期的事項 已切換到待辦頁面');
+      }else{
+        let parts=[];
+        if(upcoming.length>0){
+          parts.push('三日內有'+upcoming.length+'件：'+upcoming.map(t=>fmt3(t._d)+'要'+t.text).join('，'));
+        }
+        if(noDate.length>0){
+          parts.push('另有'+noDate.length+'件未設定日期：'+noDate.slice(0,3).map(t=>t.text).join('，')+(noDate.length>3?'等':''));
+        }
+        speakChain('目前共有'+pending.length+'件待辦。'+parts.join('。'));
+      }
     }
   }
 
