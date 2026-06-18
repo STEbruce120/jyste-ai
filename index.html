@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>鈞曜科技 AI 秘書 v1.6</title>
+<title>鈞曜科技 AI 秘書 v1.7</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <style>
 :root {
@@ -209,7 +209,7 @@ input:focus { outline: none; border-color: var(--info) !important; }
     <div class="logo"><i class="ti ti-robot"></i></div>
     <div class="header-text">
       <h1>鈞曜科技 AI 秘書</h1>
-      <p>會議記錄 ・ 待辦追蹤 ・ 每日晨報 ・ Outlook &nbsp;<span style="font-size:11px;background:#22c55e22;color:#22c55e;border:1px solid #22c55e44;border-radius:20px;padding:1px 8px;vertical-align:middle">v1.6</span></p>
+      <p>會議記錄 ・ 待辦追蹤 ・ 每日晨報 ・ Outlook &nbsp;<span style="font-size:11px;background:#22c55e22;color:#22c55e;border:1px solid #22c55e44;border-radius:20px;padding:1px 8px;vertical-align:middle">v1.7</span></p>
     </div>
     <div class="header-right" style="display:flex;gap:8px;align-items:center">
       <div class="api-status ok" id="api-status"><i class="ti ti-check"></i> AI 已連線</div>
@@ -617,12 +617,13 @@ async function loadNews(){
       {cat:'國際財經',cls:'cat-global',url:'https://feeds.bbci.co.uk/news/business/rss.xml'}
     ];
     
-    const RSS_PROXY='https://api.rss2json.com/v1/api.json?rss_url=';
+    const RSS_PROXY=`https://api.rss2json.com/v1/api.json?api_key=${NEWS_API_KEY}&rss_url=`;
 
     for(const feed of rssFeeds){
       try{
         const res=await fetch(RSS_PROXY+encodeURIComponent(feed.url)+'&count=3');
         const data=await res.json();
+        if(data.status==='error'){console.warn('RSS錯誤:',feed.cat,data.message);continue;}
         if(data.items&&data.items.length>0){
           data.items.slice(0,3).forEach(item=>{
             allNews.push({
