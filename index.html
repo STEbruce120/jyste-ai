@@ -1140,6 +1140,7 @@ const ELEVEN_API_KEY=localStorage.getItem('jyste_eleven_key')||'';
 const ELEVEN_VOICE_ID='21m00Tcm4TlvDq8ikWAM';
 let isSpeaking=false;
 let currentAudio=null;
+let speakKeepAlive=null;
 
 function buildDailyBriefing(){
   const now=new Date();
@@ -1245,49 +1246,42 @@ async function startSpeak(){
 
   window.speechSynthesis.cancel();
 
-  // 按照空格和標點切成短句（每句不超過20字）
-  const sentences=[];
-  let buf='';
-  for(const ch of preprocessTTS(text)){
-    buf+=ch;
-    if(buf.length>=20&&(ch===' '||ch==='。'||ch==='，'||ch==='！'||ch==='？')){
-      sentences.push(buf.trim());
-      buf='';
-    }
-  }
-  if(buf.trim())sentences.push(buf.trim());
-
+  const ttsText=preprocessTTS(text);
   const speed=parseFloat(document.getElementById('voice-speed').value)||1.3;
-  let idx=0;
 
   function getVoice(){
     const v=window.speechSynthesis.getVoices();
     return v.find(x=>x.lang==='zh-TW')||v.find(x=>x.lang.startsWith('zh'))||null;
   }
 
-  function speakNext(){
-    if(idx>=sentences.length||!isSpeaking){
-      isSpeaking=false;
-      document.getElementById('speak-btn').style.background='#22c55e';
-      document.getElementById('speak-btn').innerHTML='<i class="ti ti-player-play"></i> 播報';
-      return;
-    }
-    const s=sentences[idx++];
-    const u=new SpeechSynthesisUtterance(s);
+  function doSpeak(){
+    const u=new SpeechSynthesisUtterance(ttsText);
     u.lang='zh-TW';
     u.rate=speed;
     u.pitch=1.05;
     const tw=getVoice();
     if(tw)u.voice=tw;
-    u.onend=speakNext;
-    u.onerror=speakNext;
+    // Chrome TTS 保活：避免長文被引擎中途截斷
+    if(speakKeepAlive)clearInterval(speakKeepAlive);
+    speakKeepAlive=setInterval(()=>{
+      if(!isSpeaking){clearInterval(speakKeepAlive);speakKeepAlive=null;return;}
+      window.speechSynthesis.pause();
+      window.speechSynthesis.resume();
+    },5000);
+    u.onend=()=>{
+      if(speakKeepAlive){clearInterval(speakKeepAlive);speakKeepAlive=null;}
+      isSpeaking=false;
+      document.getElementById('speak-btn').style.background='#22c55e';
+      document.getElementById('speak-btn').innerHTML='<i class="ti ti-player-play"></i> 播報';
+    };
+    u.onerror=u.onend;
     window.speechSynthesis.speak(u);
   }
 
   if(window.speechSynthesis.getVoices().length===0){
-    window.speechSynthesis.onvoiceschanged=()=>{speakNext();};
+    window.speechSynthesis.onvoiceschanged=doSpeak;
   }else{
-    speakNext();
+    doSpeak();
   }
 }
 
@@ -1296,6 +1290,7 @@ function fallbackSpeak(text){
 }
 
 function stopSpeak(){
+  if(speakKeepAlive){clearInterval(speakKeepAlive);speakKeepAlive=null;}
   window.speechSynthesis.cancel();
   if(currentAudio){currentAudio.pause();currentAudio=null;}
   isSpeaking=false;
@@ -1563,6 +1558,10 @@ function preprocessTTS(text){
   text=text.replace(/\d+/g,m=>numToChinese(parseInt(m)));
   // 「二件/個/天/次/位」→「兩件/個/天/次/位」（較自然）
   text=text.replace(/二(件|個|天|次|位|人|份|種)/g,'兩$1');
+  // 中文字之間的空格改為逗號，幫助 TTS 正確斷句（避免吃字）
+  text=text.replace(/([^\x00-\x7F]) ([^\x00-\x7F])/g,'$1，$2');
+  // 多次處理（連續中文詞之間）
+  text=text.replace(/([^\x00-\x7F]) ([^\x00-\x7F])/g,'$1，$2');
   return text;
 }
 
