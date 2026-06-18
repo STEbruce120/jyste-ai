@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>鈞曜科技 AI 秘書</title>
+<title>鈞曜科技 AI 秘書 v1.6</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <style>
 :root {
@@ -1481,14 +1481,28 @@ function voiceAddTodo(taskRaw){
   document.getElementById('voice-ctrl-status').textContent=`待確認：${task}${date?' | '+date:''}`;
 }
 
+let _processingGuard=null;
+function resetProcessingState(){
+  isProcessing=false;
+  if(_processingGuard){clearTimeout(_processingGuard);_processingGuard=null;}
+  if(isAwake&&voiceCtrlActive){
+    document.getElementById('voice-ctrl-status').textContent='刀疤已喚醒 請說指令 說「再見」結束對話';
+  }
+  if(voiceCtrlActive&&voiceCtrlRecognition){
+    try{voiceCtrlRecognition.start();}catch(e){}
+  }
+}
+
 function executeVoiceCommand(cmd){
   document.getElementById('voice-ctrl-status').textContent='執行中：'+cmd;
+  // 安全護衛：10 秒後強制重置（防止任何情況下的卡死）
+  if(_processingGuard)clearTimeout(_processingGuard);
+  _processingGuard=setTimeout(resetProcessingState,10000);
 
   // 每日簡報
   if(['簡報','播報','晨報','今天狀況','今天情況','日報','早報','早安報告','今天怎樣'].some(w=>cmd.includes(w))){
     switchTab('morning');
-    // 不呼叫 speakFeedback（避免觸發麥克風重啟），直接播報
-    setTimeout(()=>startSpeak(),300);
+    setTimeout(()=>{startSpeak();setTimeout(resetProcessingState,1000);},300);
   }
   // 停止
   else if(['停止','停','不用','暫停','結束播報','好了','夠了','不要說了'].some(w=>cmd.includes(w))){
@@ -1580,11 +1594,8 @@ function speakFeedback(text){
   const tw=voices.find(v=>v.lang==='zh-TW')||voices.find(v=>v.lang.startsWith('zh'))||null;
   if(tw)utter.voice=tw;
 
-  let feedbackDone=false;
-  const onFeedbackEnd=()=>{
-    if(feedbackDone)return;
-    feedbackDone=true;
-    clearTimeout(feedbackSafetyTimer);
+  utter.onend=()=>{
+    if(_processingGuard){clearTimeout(_processingGuard);_processingGuard=null;}
     isProcessing=false;
     if(isAwake&&voiceCtrlActive){
       document.getElementById('voice-ctrl-status').textContent='刀疤已喚醒 請說指令 說「再見」結束對話';
@@ -1598,10 +1609,7 @@ function speakFeedback(text){
       setTimeout(()=>{try{voiceCtrlRecognition.start();}catch(e){}},400);
     }
   };
-  utter.onend=onFeedbackEnd;
-  utter.onerror=onFeedbackEnd;
-  // 安全逾時：5 秒內若 TTS 沒有回應，強制重置
-  const feedbackSafetyTimer=setTimeout(onFeedbackEnd,5000);
+  utter.onerror=utter.onend;
 
   window.speechSynthesis.speak(utter);
 }
@@ -1646,11 +1654,7 @@ function setupRecognitionHandlers(){
           const wv=window.speechSynthesis.getVoices();
           const wtw=wv.find(v=>v.lang==='zh-TW')||wv.find(v=>v.lang.startsWith('zh'))||null;
           if(wtw)wakeUtter.voice=wtw;
-          let wakeDone=false;
-          const onWakeEnd=()=>{
-            if(wakeDone)return;
-            wakeDone=true;
-            clearTimeout(wakeSafetyTimer);
+          const resumeListen=()=>{
             voiceCooldown=true;
             setTimeout(()=>{
               voiceCooldown=false;
@@ -1659,9 +1663,8 @@ function setupRecognitionHandlers(){
               }
             },1500);
           };
-          wakeUtter.onend=onWakeEnd;
-          wakeUtter.onerror=onWakeEnd;
-          const wakeSafetyTimer=setTimeout(onWakeEnd,4000);
+          wakeUtter.onend=resumeListen;
+          wakeUtter.onerror=resumeListen;
           window.speechSynthesis.cancel();
           window.speechSynthesis.speak(wakeUtter);
           document.getElementById('voice-ctrl-status').textContent='刀疤已喚醒 請說指令 說「再見」結束對話';
