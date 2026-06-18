@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>鈞曜科技 AI 秘書 v3.4</title>
+<title>鈞曜科技 AI 秘書 v3.5</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <style>
 :root {
@@ -209,7 +209,7 @@ input:focus { outline: none; border-color: var(--info) !important; }
     <div class="logo"><i class="ti ti-robot"></i></div>
     <div class="header-text">
       <h1>鈞曜科技 AI 秘書</h1>
-      <p>會議記錄 ・ 待辦追蹤 ・ 每日晨報 ・ Outlook &nbsp;<span style="font-size:11px;background:#22c55e22;color:#22c55e;border:1px solid #22c55e44;border-radius:20px;padding:1px 8px;vertical-align:middle">v3.4</span></p>
+      <p>會議記錄 ・ 待辦追蹤 ・ 每日晨報 ・ Outlook &nbsp;<span style="font-size:11px;background:#22c55e22;color:#22c55e;border:1px solid #22c55e44;border-radius:20px;padding:1px 8px;vertical-align:middle">v3.5</span></p>
     </div>
     <div class="header-right" style="display:flex;gap:8px;align-items:center">
       <div class="api-status ok" id="api-status"><i class="ti ti-check"></i> AI 已連線</div>
@@ -737,12 +737,18 @@ async function loadWeather(city='',dayOffset=0,voiceMode=false){
 
     // 語音模式播報
     if(voiceMode){
-      let report=`${areaName}目前${desc}，氣溫${tempC}度，體感${feelsLike}度。`;
-      report+=`今日最高${maxT}度，最低${minT}度，降雨機率${rainChance}%，紫外線${uvDesc(uv)}。`;
-      if(rainChance>50)report+='今天記得帶傘。';
-      if(parseInt(uv)>=6)report+='外出注意防曬。';
+      let report='';
       if(dayOffset===1){
-        report+=`明天${tomDesc}，最高${tomMaxT}度，最低${tomMinT}度，降雨機率${tomRain}%。`;
+        // 只播明天
+        report=`${areaName}明天${tomDesc}，最高${tomMaxT}度，最低${tomMinT}度，降雨機率${tomRain}%，紫外線${uvDesc(tomorrow.uvIndex)}。`;
+        if(tomRain>50)report+='明天記得帶傘。';
+        if(parseInt(tomorrow.uvIndex)>=6)report+='外出注意防曬。';
+      }else{
+        // 播今天
+        report=`${areaName}目前${desc}，氣溫${tempC}度，體感${feelsLike}度。`;
+        report+=`今日最高${maxT}度，最低${minT}度，降雨機率${rainChance}%，紫外線${uvDesc(uv)}。`;
+        if(rainChance>50)report+='出門記得帶傘。';
+        if(parseInt(uv)>=6)report+='外出注意防曬。';
       }
       speakChain(report);
     }
