@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>鈞曜科技 AI 秘書 v2.4</title>
+<title>鈞曜科技 AI 秘書 v2.5</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <style>
 :root {
@@ -209,7 +209,7 @@ input:focus { outline: none; border-color: var(--info) !important; }
     <div class="logo"><i class="ti ti-robot"></i></div>
     <div class="header-text">
       <h1>鈞曜科技 AI 秘書</h1>
-      <p>會議記錄 ・ 待辦追蹤 ・ 每日晨報 ・ Outlook &nbsp;<span style="font-size:11px;background:#22c55e22;color:#22c55e;border:1px solid #22c55e44;border-radius:20px;padding:1px 8px;vertical-align:middle">v2.4</span></p>
+      <p>會議記錄 ・ 待辦追蹤 ・ 每日晨報 ・ Outlook &nbsp;<span style="font-size:11px;background:#22c55e22;color:#22c55e;border:1px solid #22c55e44;border-radius:20px;padding:1px 8px;vertical-align:middle">v2.5</span></p>
     </div>
     <div class="header-right" style="display:flex;gap:8px;align-items:center">
       <div class="api-status ok" id="api-status"><i class="ti ti-check"></i> AI 已連線</div>
@@ -1699,6 +1699,10 @@ function preprocessTTS(text){
 
 function speakFeedback(text){
   _lastSpokenText=text; // 記錄，供「重複」指令使用
+
+  // ★ 關鍵：開始說話前先清除休眠計時器，避免長文字朗讀途中被打斷
+  if(sleepTimeout){clearTimeout(sleepTimeout);sleepTimeout=null;}
+
   // 停止語音辨識，避免聽到自己的聲音
   if(voiceCtrlRecognition&&voiceCtrlActive){
     try{voiceCtrlRecognition.stop();}catch(e){}
@@ -1713,7 +1717,18 @@ function speakFeedback(text){
   const tw=voices.find(v=>v.lang==='zh-TW')||voices.find(v=>v.lang.startsWith('zh'))||null;
   if(tw)utter.voice=tw;
 
+  // ★ keepAlive：長文字（新聞標題等）超過15秒 Chrome 會靜默截斷，需每5秒 pause/resume
+  let fbKeepAlive=setInterval(()=>{
+    if(window.speechSynthesis.speaking){
+      window.speechSynthesis.pause();
+      window.speechSynthesis.resume();
+    }else{
+      clearInterval(fbKeepAlive);
+    }
+  },5000);
+
   utter.onend=()=>{
+    clearInterval(fbKeepAlive);
     if(_processingGuard){clearTimeout(_processingGuard);_processingGuard=null;}
     isProcessing=false;
     if(isAwake&&voiceCtrlActive){
@@ -1728,7 +1743,7 @@ function speakFeedback(text){
       setTimeout(()=>{try{voiceCtrlRecognition.start();}catch(e){}},400);
     }
   };
-  utter.onerror=utter.onend;
+  utter.onerror=()=>{clearInterval(fbKeepAlive);utter.onend();};
 
   window.speechSynthesis.speak(utter);
 }
