@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>鈞曜科技 AI 秘書 v2.5</title>
+<title>鈞曜科技 AI 秘書 v2.6</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <style>
 :root {
@@ -209,7 +209,7 @@ input:focus { outline: none; border-color: var(--info) !important; }
     <div class="logo"><i class="ti ti-robot"></i></div>
     <div class="header-text">
       <h1>鈞曜科技 AI 秘書</h1>
-      <p>會議記錄 ・ 待辦追蹤 ・ 每日晨報 ・ Outlook &nbsp;<span style="font-size:11px;background:#22c55e22;color:#22c55e;border:1px solid #22c55e44;border-radius:20px;padding:1px 8px;vertical-align:middle">v2.5</span></p>
+      <p>會議記錄 ・ 待辦追蹤 ・ 每日晨報 ・ Outlook &nbsp;<span style="font-size:11px;background:#22c55e22;color:#22c55e;border:1px solid #22c55e44;border-radius:20px;padding:1px 8px;vertical-align:middle">v2.6</span></p>
     </div>
     <div class="header-right" style="display:flex;gap:8px;align-items:center">
       <div class="api-status ok" id="api-status"><i class="ti ti-check"></i> AI 已連線</div>
@@ -1595,16 +1595,39 @@ function executeVoiceCommand(cmd){
     }else if(!apiKey){
       speakFeedback('分析功能需要先設定 API Key');
     }else{
-      // 分析需要更長時間，延長護衛到20秒
+      // 深度分析可能需要較長時間，護衛設30秒
       if(_processingGuard){clearTimeout(_processingGuard);_processingGuard=null;}
-      _processingGuard=setTimeout(resetProcessingState,20000);
-      speakFeedback('好的 幫你分析第'+m[1]+'條 請稍等');
-      callGemini('請用繁體中文，用三到四句話說明以下新聞的重點，以及對台灣製造業或鈞曜科技的意義：'+news.title+'。'+news.summary)
+      _processingGuard=setTimeout(resetProcessingState,30000);
+      // 先切換到晨報頁面，讓使用者看到分析結果
+      switchTab('morning');
+      speakFeedback('好的 正在對第'+m[1]+'條進行深度分析 請稍等');
+      // 使用與畫面「AI 深度分析」相同的完整 prompt
+      callGemini(`你是鈞曜科技（台灣物料管理設備製造商，產品：垂直式/旋轉式自動倉儲）總經理的AI秘書。請針對以下新聞進行深度分析，用繁體中文回覆：
+
+新聞來源：${news.source||''}
+新聞標題：${news.title}
+
+【新聞概要】用3句話說明主要內容。
+【對產業的影響】說明對台灣製造業、自動化產業的影響。
+【對鈞曜科技的意義】具體說明商機、風險或注意事項。
+【行動建議】給出1～2個具體可行的建議。`)
         .then(res=>{
-          const clean=res.replace(/[【】\*#]/g,'').trim();
-          speakFeedback(clean.slice(0,350));
+          // 同步更新畫面上的新聞詳情區塊
+          const detailEl=document.getElementById('news-detail-'+idx);
+          if(detailEl){
+            detailEl.style.display='block';
+            detailEl.innerHTML=res.replace(/\n/g,'<br>');
+            detailEl.scrollIntoView({behavior:'smooth',block:'center'});
+          }
+          // 整理成 TTS 用的純文字（去掉標記符號、換行轉逗號）
+          const ttsText=res
+            .replace(/【([^】]+)】/g,'$1，')
+            .replace(/[*#\n]+/g,' ')
+            .trim()
+            .slice(0,700);
+          speakFeedback(ttsText);
         })
-        .catch(()=>speakFeedback('分析失敗 請稍後再試'));
+        .catch(()=>speakFeedback('深度分析失敗 請稍後再試'));
     }
   }
 
