@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>鈞曜科技 AI 秘書 v1.8</title>
+<title>鈞曜科技 AI 秘書 v1.9</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <style>
 :root {
@@ -209,7 +209,7 @@ input:focus { outline: none; border-color: var(--info) !important; }
     <div class="logo"><i class="ti ti-robot"></i></div>
     <div class="header-text">
       <h1>鈞曜科技 AI 秘書</h1>
-      <p>會議記錄 ・ 待辦追蹤 ・ 每日晨報 ・ Outlook &nbsp;<span style="font-size:11px;background:#22c55e22;color:#22c55e;border:1px solid #22c55e44;border-radius:20px;padding:1px 8px;vertical-align:middle">v1.8</span></p>
+      <p>會議記錄 ・ 待辦追蹤 ・ 每日晨報 ・ Outlook &nbsp;<span style="font-size:11px;background:#22c55e22;color:#22c55e;border:1px solid #22c55e44;border-radius:20px;padding:1px 8px;vertical-align:middle">v1.9</span></p>
     </div>
     <div class="header-right" style="display:flex;gap:8px;align-items:center">
       <div class="api-status ok" id="api-status"><i class="ti ti-check"></i> AI 已連線</div>
@@ -606,62 +606,66 @@ async function loadNews(){
   btn.disabled=true;
   document.getElementById('news-container').innerHTML=`<div class="loading-box"><i class="ti ti-loader-2 spin" style="font-size:28px;display:block;margin-bottom:8px"></i>載入今日真實新聞中...</div>`;
   try{
-    // 抓取四類真實新聞
+    // 直接解析 RSS XML（不依賴第三方 API key）
     let allNews=[];
-    
-    // 使用 RSS2JSON 服務取得真實新聞（支援跨來源）
+
     const rssFeeds=[
       {cat:'台灣經濟/商業',cls:'cat-tw',url:'https://www.bnext.com.tw/rss'},
       {cat:'科技/AI',cls:'cat-tech',url:'https://technews.tw/feed/'},
-      {cat:'製造業/自動化',cls:'cat-mfg',url:'https://www.digitimes.com.tw/rss/rss.asp'},
+      {cat:'製造業/自動化',cls:'cat-mfg',url:'https://www.cna.com.tw/rss/aall.aspx'},
       {cat:'國際財經',cls:'cat-global',url:'https://feeds.bbci.co.uk/news/business/rss.xml'}
     ];
-    
-    const RSS_PROXY='https://api.rss2json.com/v1/api.json?rss_url=';
+
+    // CORS proxy 列表，依序嘗試
+    const CORS_PROXIES=[
+      u=>`https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+      u=>`https://corsproxy.io/?${encodeURIComponent(u)}`
+    ];
+
+    async function fetchRSS(feedUrl){
+      for(const proxy of CORS_PROXIES){
+        try{
+          const r=await fetch(proxy(feedUrl),{signal:AbortSignal.timeout(8000)});
+          if(!r.ok)continue;
+          const txt=await r.text();
+          const xml=new DOMParser().parseFromString(txt,'text/xml');
+          if(xml.querySelector('parsererror'))continue;
+          return xml;
+        }catch(e){continue;}
+      }
+      return null;
+    }
 
     for(const feed of rssFeeds){
       try{
-        const res=await fetch(RSS_PROXY+encodeURIComponent(feed.url)+'&count=3');
-        const data=await res.json();
-        if(data.status==='error'){console.warn('RSS錯誤:',feed.cat,data.message);continue;}
-        if(data.items&&data.items.length>0){
-          data.items.slice(0,3).forEach(item=>{
-            allNews.push({
-              cat:feed.cat,
-              cls:feed.cls,
-              title:item.title||'',
-              source:data.feed?.title||feed.cat,
-              summary:item.description?.replace(/<[^>]*>/g,'')||'',
-              url:item.link||'',
-              publishedAt:item.pubDate||''
-            });
-          });
-        }
-      }catch(e){
-        console.log('RSS載入失敗:',feed.cat,e);
-      }
+        const xml=await fetchRSS(feed.url);
+        if(!xml)continue;
+        const items=[...xml.querySelectorAll('item')].slice(0,3);
+        const chanTitle=xml.querySelector('channel>title')?.textContent||feed.cat;
+        items.forEach(item=>{
+          const title=item.querySelector('title')?.textContent?.trim()||'';
+          if(!title)return;
+          const link=item.querySelector('link')?.textContent?.trim()||
+                      item.querySelector('link')?.nextSibling?.textContent?.trim()||'';
+          const desc=(item.querySelector('description')?.textContent||'').replace(/<[^>]*>/g,'').trim().slice(0,120);
+          const pub=item.querySelector('pubDate')?.textContent||'';
+          allNews.push({cat:feed.cat,cls:feed.cls,title,source:chanTitle,summary:desc,url:link,publishedAt:pub});
+        });
+      }catch(e){console.warn('RSS失敗:',feed.cat,e);}
     }
 
-    // 如果 RSS 也失敗，用 Groq AI 提供近期新聞摘要
+    // RSS 全部失敗時，用 Groq AI 補充（需有 API Key）
     if(allNews.length===0){
-      const res=await callGemini(`你是新聞助理。請提供最近的10則重要新聞（盡量基於你知道的真實事件），分成四類：製造業/自動化、台灣經濟/商業、國際財經、科技/AI。
-
-嚴格用JSON格式回覆：
-{"news":[{"cat":"製造業/自動化","title":"真實新聞標題","source":"媒體來源","summary":"摘要"}]}
-共10則。`);
+      if(!apiKey){throw new Error('RSS 來源暫時無法連線，請稍後再試或設定 Groq API Key 使用 AI 新聞');}
+      const res=await callGemini(`你是新聞助理。請提供10則重要新聞，分四類：製造業/自動化、台灣經濟/商業、國際財經、科技/AI。JSON格式：{"news":[{"cat":"製造業/自動化","title":"標題","source":"媒體","summary":"摘要"}]}`);
       try{
-        const clean=res.replace(/\`\`\`json|\`\`\`/g,'').trim();
-        const parsed=JSON.parse(clean);
+        const parsed=JSON.parse(res.replace(/```json|```/g,'').trim());
         const catCls={'製造業/自動化':'cat-mfg','台灣經濟/商業':'cat-tw','國際財經':'cat-global','科技/AI':'cat-tech'};
-        parsed.news.forEach(n=>{
-          allNews.push({cat:n.cat,cls:catCls[n.cat]||'cat-global',title:n.title,source:n.source,summary:n.summary,url:'',publishedAt:''});
-        });
+        parsed.news.forEach(n=>allNews.push({cat:n.cat,cls:catCls[n.cat]||'cat-global',title:n.title,source:n.source,summary:n.summary,url:'',publishedAt:''}));
       }catch(e){}
     }
 
-    if(allNews.length===0){
-      throw new Error('無法載入新聞，請稍後再試');
-    }
+    if(allNews.length===0){throw new Error('RSS 來源暫時無法連線，請稍後再試');}
 
     document.getElementById('news-container').innerHTML=allNews.map((n,i)=>{
       const date=n.publishedAt?new Date(n.publishedAt).toLocaleDateString('zh-TW'):'';
