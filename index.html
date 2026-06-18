@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>鈞曜科技 AI 秘書 v3.9</title>
+<title>鈞曜科技 AI 秘書 v3.10</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <style>
 :root {
@@ -209,7 +209,7 @@ input:focus { outline: none; border-color: var(--info) !important; }
     <div class="logo"><i class="ti ti-robot"></i></div>
     <div class="header-text">
       <h1>鈞曜科技 AI 秘書</h1>
-      <p>會議記錄 ・ 待辦追蹤 ・ 每日晨報 ・ Outlook &nbsp;<span style="font-size:11px;background:#22c55e22;color:#22c55e;border:1px solid #22c55e44;border-radius:20px;padding:1px 8px;vertical-align:middle">v3.9</span></p>
+      <p>會議記錄 ・ 待辦追蹤 ・ 每日晨報 ・ Outlook &nbsp;<span style="font-size:11px;background:#22c55e22;color:#22c55e;border:1px solid #22c55e44;border-radius:20px;padding:1px 8px;vertical-align:middle">v3.10</span></p>
     </div>
     <div class="header-right" style="display:flex;gap:8px;align-items:center">
       <div class="api-status ok" id="api-status"><i class="ti ti-check"></i> AI 已連線</div>
@@ -1920,8 +1920,9 @@ function preprocessTTS(text){
     if(n<10)return d[n];
     if(n===10)return'十';
     if(n<20)return'十'+(n>10?d[n-10]:'');
-    const t=Math.floor(n/10),o=n%10;
-    return d[t]+'十'+(o?d[o]:'');
+    if(n<100){const t=Math.floor(n/10),o=n%10;return d[t]+'十'+(o?d[o]:'');}
+    // 三位數以上逐字念：2026→二零二六、803→八零三（年份/代號最自然）
+    return String(n).split('').map(c=>d[parseInt(c)]).join('');
   }
   // 百分比先轉「百分之X」，避免 % 符號被 TTS 靜默略過
   text=text.replace(/(\d+(\.\d+)?)%/g,'百分之$1');
