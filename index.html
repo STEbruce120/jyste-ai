@@ -1209,7 +1209,7 @@ function buildDailyBriefing(){
     ' 今天也請多保重 有事找我',
     ' 工作順利 有需要我隨時在',
     ' 記得適時休息 有事直接說',
-    ' 今天辛苦了 有需要隨時來找我'
+    ' 今天累了吧 有需要隨時來找我'
   ];
   text+=endings[Math.floor(Math.random()*endings.length)];
 
@@ -1248,7 +1248,7 @@ async function startSpeak(){
   // 按照空格和標點切成短句（每句不超過20字）
   const sentences=[];
   let buf='';
-  for(const ch of text){
+  for(const ch of preprocessTTS(text)){
     buf+=ch;
     if(buf.length>=20&&(ch===' '||ch==='。'||ch==='，'||ch==='！'||ch==='？')){
       sentences.push(buf.trim());
@@ -1549,6 +1549,23 @@ function speakAfterDelay(text, delay){
   },delay);
 }
 
+function preprocessTTS(text){
+  // 數字轉中文（避免 TTS 跳過阿拉伯數字）
+  function numToChinese(n){
+    const d=['零','一','二','三','四','五','六','七','八','九'];
+    if(n===0)return'零';
+    if(n<10)return d[n];
+    if(n===10)return'十';
+    if(n<20)return'十'+(n>10?d[n-10]:'');
+    const t=Math.floor(n/10),o=n%10;
+    return d[t]+'十'+(o?d[o]:'');
+  }
+  text=text.replace(/\d+/g,m=>numToChinese(parseInt(m)));
+  // 「二件/個/天/次/位」→「兩件/個/天/次/位」（較自然）
+  text=text.replace(/二(件|個|天|次|位|人|份|種)/g,'兩$1');
+  return text;
+}
+
 function speakFeedback(text){
   // 停止語音辨識，避免聽到自己的聲音
   if(voiceCtrlRecognition&&voiceCtrlActive){
@@ -1556,7 +1573,7 @@ function speakFeedback(text){
   }
   window.speechSynthesis.cancel();
 
-  const utter=new SpeechSynthesisUtterance(text);
+  const utter=new SpeechSynthesisUtterance(preprocessTTS(text));
   utter.lang='zh-TW';
   utter.rate=1.15;
   utter.pitch=1.05;
