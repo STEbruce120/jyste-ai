@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>鈞曜科技 AI 秘書 v2.6</title>
+<title>鈞曜科技 AI 秘書 v2.7</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <style>
 :root {
@@ -209,7 +209,7 @@ input:focus { outline: none; border-color: var(--info) !important; }
     <div class="logo"><i class="ti ti-robot"></i></div>
     <div class="header-text">
       <h1>鈞曜科技 AI 秘書</h1>
-      <p>會議記錄 ・ 待辦追蹤 ・ 每日晨報 ・ Outlook &nbsp;<span style="font-size:11px;background:#22c55e22;color:#22c55e;border:1px solid #22c55e44;border-radius:20px;padding:1px 8px;vertical-align:middle">v2.6</span></p>
+      <p>會議記錄 ・ 待辦追蹤 ・ 每日晨報 ・ Outlook &nbsp;<span style="font-size:11px;background:#22c55e22;color:#22c55e;border:1px solid #22c55e44;border-radius:20px;padding:1px 8px;vertical-align:middle">v2.7</span></p>
     </div>
     <div class="header-right" style="display:flex;gap:8px;align-items:center">
       <div class="api-status ok" id="api-status"><i class="ti ti-check"></i> AI 已連線</div>
@@ -688,7 +688,7 @@ async function loadNews(voiceMode=false){
     if(voiceMode&&isAwake&&voiceCtrlActive){
       const nums=['第一條','第二條','第三條','第四條','第五條','第六條','第七條','第八條'];
       const titleText=allNews.map((n,i)=>`${nums[i]}：${n.title.split(' - ')[0]}`).join('。');
-      setTimeout(()=>speakFeedback('新聞載入完成，'+titleText+'。如有興趣請說第幾條分析'),800);
+      setTimeout(()=>speakChain('新聞載入完成，'+titleText+'。如有興趣請說第幾條分析'),800);
     }
 
     document.getElementById('news-container').innerHTML=allNews.map((n,i)=>{
@@ -1625,7 +1625,7 @@ function executeVoiceCommand(cmd){
             .replace(/[*#\n]+/g,' ')
             .trim()
             .slice(0,700);
-          speakFeedback(ttsText);
+          speakChain(ttsText);
         })
         .catch(()=>speakFeedback('深度分析失敗 請稍後再試'));
     }
@@ -1740,18 +1740,10 @@ function speakFeedback(text){
   const tw=voices.find(v=>v.lang==='zh-TW')||voices.find(v=>v.lang.startsWith('zh'))||null;
   if(tw)utter.voice=tw;
 
-  // ★ keepAlive：長文字（新聞標題等）超過15秒 Chrome 會靜默截斷，需每5秒 pause/resume
-  let fbKeepAlive=setInterval(()=>{
-    if(window.speechSynthesis.speaking){
-      window.speechSynthesis.pause();
-      window.speechSynthesis.resume();
-    }else{
-      clearInterval(fbKeepAlive);
-    }
-  },5000);
+  // ★ 注意：speakFeedback 僅供短句（<10秒）使用，不加 keepAlive
+  //    長文字請改用 speakChain()，避免 pause/resume 觸發假 onend 導致誤計 sleepTimeout
 
   utter.onend=()=>{
-    clearInterval(fbKeepAlive);
     if(_processingGuard){clearTimeout(_processingGuard);_processingGuard=null;}
     isProcessing=false;
     if(isAwake&&voiceCtrlActive){
@@ -1766,9 +1758,70 @@ function speakFeedback(text){
       setTimeout(()=>{try{voiceCtrlRecognition.start();}catch(e){}},400);
     }
   };
-  utter.onerror=()=>{clearInterval(fbKeepAlive);utter.onend();};
+  utter.onerror=utter.onend;
 
   window.speechSynthesis.speak(utter);
+}
+
+// 長文字接力朗讀（切成每段≤40字，逐段播放，徹底繞過 Chrome 15秒截斷限制）
+// 每段都很短，不需要 keepAlive，也不會有假 onend 問題
+function speakChain(text){
+  _lastSpokenText=text;
+  if(sleepTimeout){clearTimeout(sleepTimeout);sleepTimeout=null;}
+  if(voiceCtrlRecognition&&voiceCtrlActive){try{voiceCtrlRecognition.stop();}catch(e){}}
+  window.speechSynthesis.cancel();
+
+  // 先做 TTS 預處理，再依句末符號切分
+  const processed=preprocessTTS(text);
+  const raw=processed
+    .replace(/([。！？])/g,'$1|')
+    .split('|')
+    .map(s=>s.trim())
+    .filter(s=>s.length>0);
+
+  // 合併太短的片段，目標每段 30-45 字（約4-6秒）
+  const chunks=[];
+  let buf='';
+  for(const s of raw){
+    buf+=s;
+    if(buf.length>=35){chunks.push(buf);buf='';}
+  }
+  if(buf)chunks.push(buf);
+  if(chunks.length===0){_voiceChainDone();return;}
+
+  let idx=0;
+  function next(){
+    if(sleepTimeout){clearTimeout(sleepTimeout);sleepTimeout=null;}
+    if(idx>=chunks.length){_voiceChainDone();return;}
+    // 若語音控制已關閉或離開喚醒狀態，停止朗讀
+    if(voiceCtrlActive&&!isAwake){_voiceChainDone();return;}
+    const u=new SpeechSynthesisUtterance(chunks[idx]);
+    u.lang='zh-TW';u.rate=1.15;u.pitch=1.05;
+    const vv=window.speechSynthesis.getVoices();
+    const tw=vv.find(v=>v.lang==='zh-TW')||vv.find(v=>v.lang.startsWith('zh'))||null;
+    if(tw)u.voice=tw;
+    idx++;
+    u.onend=()=>setTimeout(next,150);
+    u.onerror=u.onend; // 單段出錯繼續播下一段
+    window.speechSynthesis.speak(u);
+  }
+  next();
+}
+// speakChain 全部播完後的收尾（恢復辨識、設定 sleepTimeout）
+function _voiceChainDone(){
+  if(_processingGuard){clearTimeout(_processingGuard);_processingGuard=null;}
+  isProcessing=false;
+  if(isAwake&&voiceCtrlActive){
+    document.getElementById('voice-ctrl-status').textContent='刀疤已喚醒 請說指令 說「再見」結束對話';
+    if(sleepTimeout)clearTimeout(sleepTimeout);
+    sleepTimeout=setTimeout(()=>{
+      setAwakeMode(false);
+      speakFeedback('我先休息一下 需要的時候叫我');
+    },30000);
+  }
+  if(voiceCtrlActive&&voiceCtrlRecognition){
+    setTimeout(()=>{try{voiceCtrlRecognition.start();}catch(e){}},400);
+  }
 }
 
 function setupRecognitionHandlers(){
