@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>鈞曜科技 AI 秘書 v1.9</title>
+<title>鈞曜科技 AI 秘書 v2.0</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <style>
 :root {
@@ -209,7 +209,7 @@ input:focus { outline: none; border-color: var(--info) !important; }
     <div class="logo"><i class="ti ti-robot"></i></div>
     <div class="header-text">
       <h1>鈞曜科技 AI 秘書</h1>
-      <p>會議記錄 ・ 待辦追蹤 ・ 每日晨報 ・ Outlook &nbsp;<span style="font-size:11px;background:#22c55e22;color:#22c55e;border:1px solid #22c55e44;border-radius:20px;padding:1px 8px;vertical-align:middle">v1.9</span></p>
+      <p>會議記錄 ・ 待辦追蹤 ・ 每日晨報 ・ Outlook &nbsp;<span style="font-size:11px;background:#22c55e22;color:#22c55e;border:1px solid #22c55e44;border-radius:20px;padding:1px 8px;vertical-align:middle">v2.0</span></p>
     </div>
     <div class="header-right" style="display:flex;gap:8px;align-items:center">
       <div class="api-status ok" id="api-status"><i class="ti ti-check"></i> AI 已連線</div>
@@ -613,7 +613,7 @@ async function loadNews(){
       {cat:'台灣經濟/商業',cls:'cat-tw',url:'https://www.bnext.com.tw/rss'},
       {cat:'科技/AI',cls:'cat-tech',url:'https://technews.tw/feed/'},
       {cat:'製造業/自動化',cls:'cat-mfg',url:'https://www.cna.com.tw/rss/aall.aspx'},
-      {cat:'國際財經',cls:'cat-global',url:'https://feeds.bbci.co.uk/news/business/rss.xml'}
+      {cat:'國際財經',cls:'cat-global',url:'https://www.cna.com.tw/rss/afinance.aspx'}
     ];
 
     // CORS proxy 列表，依序嘗試
@@ -703,29 +703,24 @@ async function expandNews(idx,titleEncoded,sourceEncoded){
   const title=decodeURIComponent(titleEncoded);
   const source=decodeURIComponent(sourceEncoded||'');
   detail.style.display='block';
+  if(!apiKey){
+    detail.innerHTML='<span style="color:var(--warning)">⚠️ 請先在右上角設定 Groq API Key 才能使用 AI 深度分析</span>';
+    return;
+  }
   detail.innerHTML='<i class="ti ti-loader-2 spin"></i> 深度分析中...';
   try{
-    const res=await callGemini(`你是鈞曜科技（台灣物料管理設備製造商，產品：垂直式/旋轉式自動倉儲）總經理的AI秘書。
+    const res=await callGemini(`你是鈞曜科技（台灣物料管理設備製造商，產品：垂直式/旋轉式自動倉儲）總經理的AI秘書。請針對以下新聞進行深度分析，用繁體中文回覆：
 
-請針對以下新聞進行深度分析，用繁體中文回覆，格式如下：
+新聞來源：${source}
+新聞標題：${title}
 
-📰 新聞來源：${source}
-📋 新聞標題：${title}
-
-【新聞概要】
-用3～5句話說明這則新聞的主要內容和背景。
-
-【對產業的影響】
-說明這則新聞對台灣製造業、自動化產業的整體影響。
-
-【對鈞曜科技的意義】
-具體說明這則新聞對鈞曜科技的商機、風險或注意事項。
-
-【總經理行動建議】
-給出1～2個具體可行的行動建議。`);
+【新聞概要】用3句話說明主要內容。
+【對產業的影響】說明對台灣製造業、自動化產業的影響。
+【對鈞曜科技的意義】具體說明商機、風險或注意事項。
+【行動建議】給出1～2個具體可行的建議。`);
     detail.innerHTML=res.replace(/\n/g,'<br>');
   }catch(e){
-    detail.innerHTML='分析失敗，請稍後再試。';
+    detail.innerHTML=`<span style="color:var(--danger)">⚠️ 分析失敗：${e.message}</span>`;
   }
 }
 
