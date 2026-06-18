@@ -209,7 +209,7 @@ input:focus { outline: none; border-color: var(--info) !important; }
     <div class="logo"><i class="ti ti-robot"></i></div>
     <div class="header-text">
       <h1>鈞曜科技 AI 秘書</h1>
-      <p>會議記錄 ・ 待辦追蹤 ・ 每日晨報 ・ Outlook</p>
+      <p>會議記錄 ・ 待辦追蹤 ・ 每日晨報 ・ Outlook &nbsp;<span style="font-size:11px;background:#22c55e22;color:#22c55e;border:1px solid #22c55e44;border-radius:20px;padding:1px 8px;vertical-align:middle">v1.6</span></p>
     </div>
     <div class="header-right" style="display:flex;gap:8px;align-items:center">
       <div class="api-status ok" id="api-status"><i class="ti ti-check"></i> AI 已連線</div>
@@ -1273,6 +1273,17 @@ async function startSpeak(){
       isSpeaking=false;
       document.getElementById('speak-btn').style.background='#22c55e';
       document.getElementById('speak-btn').innerHTML='<i class="ti ti-player-play"></i> 播報';
+      // 每日簡報播完後重置語音控制狀態
+      if(_processingGuard){clearTimeout(_processingGuard);_processingGuard=null;}
+      isProcessing=false;
+      if(isAwake&&voiceCtrlActive){
+        document.getElementById('voice-ctrl-status').textContent='刀疤已喚醒 請說指令 說「再見」結束對話';
+        if(sleepTimeout)clearTimeout(sleepTimeout);
+        sleepTimeout=setTimeout(()=>{setAwakeMode(false);speakFeedback('我先休息一下 需要的時候叫我');},30000);
+      }
+      if(voiceCtrlActive&&voiceCtrlRecognition){
+        setTimeout(()=>{try{voiceCtrlRecognition.start();}catch(e){}},400);
+      }
     };
     u.onerror=u.onend;
     window.speechSynthesis.speak(u);
@@ -1502,7 +1513,7 @@ function executeVoiceCommand(cmd){
   // 每日簡報
   if(['簡報','播報','晨報','今天狀況','今天情況','日報','早報','早安報告','今天怎樣'].some(w=>cmd.includes(w))){
     switchTab('morning');
-    setTimeout(()=>{startSpeak();setTimeout(resetProcessingState,1000);},300);
+    setTimeout(()=>startSpeak(),300);
   }
   // 停止
   else if(['停止','停','不用','暫停','結束播報','好了','夠了','不要說了'].some(w=>cmd.includes(w))){
