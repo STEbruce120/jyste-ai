@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>鈞曜科技 AI 秘書 v2.8</title>
+<title>鈞曜科技 AI 秘書 v3.0</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <style>
 :root {
@@ -209,7 +209,7 @@ input:focus { outline: none; border-color: var(--info) !important; }
     <div class="logo"><i class="ti ti-robot"></i></div>
     <div class="header-text">
       <h1>鈞曜科技 AI 秘書</h1>
-      <p>會議記錄 ・ 待辦追蹤 ・ 每日晨報 ・ Outlook &nbsp;<span style="font-size:11px;background:#22c55e22;color:#22c55e;border:1px solid #22c55e44;border-radius:20px;padding:1px 8px;vertical-align:middle">v2.8</span></p>
+      <p>會議記錄 ・ 待辦追蹤 ・ 每日晨報 ・ Outlook &nbsp;<span style="font-size:11px;background:#22c55e22;color:#22c55e;border:1px solid #22c55e44;border-radius:20px;padding:1px 8px;vertical-align:middle">v3.0</span></p>
     </div>
     <div class="header-right" style="display:flex;gap:8px;align-items:center">
       <div class="api-status ok" id="api-status"><i class="ti ti-check"></i> AI 已連線</div>
@@ -304,6 +304,24 @@ input:focus { outline: none; border-color: var(--info) !important; }
         </div>
       </div>
       <div id="speak-text" style="margin-top:10px;font-size:13px;color:var(--text2);line-height:1.7;display:none;padding:10px;background:var(--bg3);border-radius:6px;border-left:3px solid #22c55e"></div>
+    </div>
+
+    <!-- 天氣查詢 -->
+    <div class="card" style="margin-bottom:1rem">
+      <div class="card-title">
+        <div class="card-title-left"><i class="ti ti-cloud-sun"></i> 即時天氣</div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input id="weather-city" type="text" placeholder="城市（留空自動定位）"
+            style="padding:5px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;width:160px"
+            onkeydown="if(event.key==='Enter')loadWeather(this.value.trim(),0)">
+          <button class="btn-primary" onclick="loadWeather(document.getElementById('weather-city').value.trim(),0)">
+            <i class="ti ti-refresh"></i> 查詢
+          </button>
+        </div>
+      </div>
+      <div id="weather-container">
+        <div class="empty"><i class="ti ti-cloud"></i>點擊查詢或說「今天天氣」</div>
+      </div>
     </div>
 
     <div class="card">
@@ -489,6 +507,7 @@ async function sbDelete(table,id){
 let todos=[], meetings=[], currentFilter='all', lastExtractedTodos=[], apiKey=localStorage.getItem('jyste_groq_key')||'';
 let _voiceNewsItems=[];  // 儲存最近載入的新聞，供語音分析使用
 let _lastSpokenText='';  // 記住最後一句話，供「重複」指令使用
+let _completedToday=[];  // 本次開啟後完成的待辦，供晚間簡報使用
 const STORAGE_KEY_TODOS='jyste_todos_v3', STORAGE_KEY_MEETINGS='jyste_meetings_v3', STORAGE_KEY_API='jyste_groq_key';
 const weekdays=['日','一','二','三','四','五','六'];
 
@@ -599,6 +618,119 @@ function updateMorningStats(){
     ${urgent?`<div class="morning-stat" style="color:var(--danger)"><i class="ti ti-alert-circle"></i> 即將到期 <strong>${urgent}</strong> 件</div>`:''}
     ${today?`<div class="morning-stat" style="color:var(--purple)"><i class="ti ti-calendar"></i> 今日到期 <strong>${today}</strong> 件</div>`:''}
   `;
+}
+
+// ── 天氣查詢（wttr.in，免費免金鑰）───────────────────────────────
+function translateWeather(desc){
+  const m={
+    'Sunny':'晴天','Clear':'晴天','Partly cloudy':'多雲時晴','Partly Cloudy':'多雲時晴',
+    'Cloudy':'陰天','Overcast':'多雲','Mist':'有霧','Fog':'大霧','Haze':'霾',
+    'Patchy rain possible':'局部有雨','Light rain':'小雨','Light rain shower':'短暫小雨',
+    'Moderate rain':'中雨','Moderate rain at times':'間歇中雨',
+    'Heavy rain':'大雨','Heavy rain at times':'間歇大雨','Heavy showers':'大陣雨',
+    'Light drizzle':'毛毛雨','Drizzle':'細雨','Freezing drizzle':'凍雨',
+    'Thundery outbreaks possible':'可能有雷陣雨',
+    'Patchy light rain with thunder':'局部雷陣雨',
+    'Moderate or heavy rain with thunder':'大雷陣雨',
+    'Blowing snow':'吹雪','Blizzard':'暴風雪',
+    'Light snow':'小雪','Moderate snow':'中雪','Heavy snow':'大雪',
+    'Light sleet':'輕度雨夾雪','Ice pellets':'冰雹',
+    'Patchy snow possible':'局部可能降雪',
+  };
+  return m[desc]||desc;
+}
+function uvDesc(uv){
+  const n=parseInt(uv);
+  if(n<=2)return'低';if(n<=5)return'中等';if(n<=7)return'高';if(n<=10)return'非常高';return'危險';
+}
+function uvColor(uv){
+  const n=parseInt(uv);
+  if(n<=2)return'#22c55e';if(n<=5)return'#eab308';if(n<=7)return'#f97316';return'#ef4444';
+}
+async function loadWeather(city='',dayOffset=0,voiceMode=false){
+  const box=document.getElementById('weather-container');
+  box.innerHTML='<div class="loading-box"><i class="ti ti-loader-2 spin" style="font-size:22px;display:block;margin-bottom:6px"></i>查詢天氣中...</div>';
+  try{
+    // 優先使用輸入城市，否則嘗試 IP 定位（wttr.in 自動偵測）
+    const query=city?encodeURIComponent(city):'';
+    const proxy='https://corsproxy.io/?';
+    const url=`${proxy}https://wttr.in/${query}?format=j1`;
+    const resp=await fetch(url,{signal:AbortSignal.timeout(8000)});
+    if(!resp.ok)throw new Error('查詢失敗');
+    const data=await resp.json();
+
+    const area=data.nearest_area[0];
+    const areaName=area.areaName[0].value;
+    const cc=data.current_condition[0];
+    const tempC=cc.temp_C;
+    const feelsLike=cc.FeelsLikeC;
+    const humidity=cc.humidity;
+    const desc=translateWeather(cc.weatherDesc[0].value);
+    const uv=cc.uvIndex;
+    const windKmph=cc.windspeedKmph;
+    const today=data.weather[0];
+    const maxT=today.maxtempC;
+    const minT=today.mintempC;
+    const rainChance=Math.max(...today.hourly.map(h=>parseInt(h.chanceofrain)));
+    const tomorrow=data.weather[1]||today;
+    const tomMaxT=tomorrow.maxtempC;
+    const tomMinT=tomorrow.mintempC;
+    const tomRain=Math.max(...tomorrow.hourly.map(h=>parseInt(h.chanceofrain)));
+    const tomDesc=translateWeather(tomorrow.hourly[4]?.weatherDesc[0].value||'');
+
+    // 渲染天氣卡片
+    box.innerHTML=`
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:4px">
+        <div style="background:var(--bg3);border-radius:10px;padding:14px">
+          <div style="font-size:12px;color:var(--text2);margin-bottom:4px"><i class="ti ti-map-pin"></i> ${areaName} · 現在</div>
+          <div style="font-size:32px;font-weight:600;color:var(--text);line-height:1">${tempC}°C</div>
+          <div style="font-size:14px;color:var(--text2);margin-top:4px">${desc}</div>
+          <div style="font-size:12px;color:var(--text2);margin-top:8px;display:flex;flex-wrap:wrap;gap:8px">
+            <span><i class="ti ti-thermometer"></i> 體感 ${feelsLike}°C</span>
+            <span><i class="ti ti-droplet"></i> 濕度 ${humidity}%</span>
+            <span><i class="ti ti-wind"></i> 風速 ${windKmph}km/h</span>
+          </div>
+        </div>
+        <div style="background:var(--bg3);border-radius:10px;padding:14px">
+          <div style="font-size:12px;color:var(--text2);margin-bottom:8px">今日 / 明日</div>
+          <div style="font-size:13px;margin-bottom:6px">
+            <span style="color:var(--text)">今天</span>
+            <span style="color:#ef4444;margin-left:8px">↑${maxT}°</span>
+            <span style="color:#60a5fa;margin-left:4px">↓${minT}°</span>
+            <span style="color:var(--text2);margin-left:8px;font-size:12px">🌧 ${rainChance}%</span>
+          </div>
+          <div style="font-size:13px;margin-bottom:10px">
+            <span style="color:var(--text2)">明天</span>
+            <span style="color:#ef4444;margin-left:8px">↑${tomMaxT}°</span>
+            <span style="color:#60a5fa;margin-left:4px">↓${tomMinT}°</span>
+            <span style="color:var(--text2);margin-left:8px;font-size:12px">🌧 ${tomRain}%</span>
+          </div>
+          <div style="font-size:12px">
+            <span style="background:${uvColor(uv)}22;color:${uvColor(uv)};padding:2px 8px;border-radius:20px;border:1px solid ${uvColor(uv)}44">
+              ☀️ UV ${uv}（${uvDesc(uv)}）
+            </span>
+          </div>
+        </div>
+      </div>
+      ${rainChance>50?'<div style="margin-top:8px;font-size:12px;color:#eab308;padding:6px 10px;background:#eab30811;border-radius:6px;border-left:3px solid #eab308"><i class="ti ti-umbrella"></i> 今日降雨機率較高，出門記得帶傘</div>':''}
+      ${parseInt(uv)>=6?'<div style="margin-top:6px;font-size:12px;color:#f97316;padding:6px 10px;background:#f9731611;border-radius:6px;border-left:3px solid #f97316"><i class="ti ti-sun"></i> 紫外線指數偏高，注意防曬</div>':''}
+    `;
+
+    // 語音模式播報
+    if(voiceMode){
+      let report=`${areaName}目前${desc}，氣溫${tempC}度，體感${feelsLike}度。`;
+      report+=`今日最高${maxT}度，最低${minT}度，降雨機率${rainChance}%，紫外線${uvDesc(uv)}。`;
+      if(rainChance>50)report+='今天記得帶傘。';
+      if(parseInt(uv)>=6)report+='外出注意防曬。';
+      if(dayOffset===1){
+        report+=`明天${tomDesc}，最高${tomMaxT}度，最低${tomMinT}度，降雨機率${tomRain}%。`;
+      }
+      speakChain(report);
+    }
+  }catch(e){
+    box.innerHTML=`<div class="hint-box" style="color:var(--danger)"><i class="ti ti-alert-circle"></i> 天氣查詢失敗：${e.message}</div>`;
+    if(voiceMode)speakFeedback('天氣查詢失敗 請稍後再試');
+  }
 }
 
 const NEWS_API_KEY=localStorage.getItem('jyste_news_key')||'cc1b900baad94cd8bc2a69cc79739709';
@@ -1005,6 +1137,13 @@ function toggleTodo(id){
   const t=todos.find(t=>t.id===id);
   if(t){
     t.done=!t.done;
+    // 剛完成：記錄到本日追蹤清單
+    if(t.done){
+      if(!_completedToday.find(x=>x.id===t.id)) _completedToday.push({...t});
+    }else{
+      // 取消完成：從追蹤清單移除
+      _completedToday=_completedToday.filter(x=>x.id!==t.id);
+    }
     sbUpdate('todos',t.id,{done:t.done}).catch(()=>{});
     saveData();renderTodos();updateMorningStats();checkReminders();
   }
@@ -1578,6 +1717,16 @@ function executeVoiceCommand(cmd){
     speakFeedback('好的 幫你載入今日新聞 載完後會朗讀標題');
   }
 
+  // ── 天氣查詢 ──────────────────────────────────────────────────
+  else if(['天氣','幾度','下雨','帶傘','冷不冷','熱不熱','外面冷','外面熱','紫外線','溫度','氣溫'].some(w=>cmd.includes(w))){
+    const cities=['台北','台中','高雄','台南','桃園','新竹','苗栗','彰化','南投','嘉義','屏東','花蓮','宜蘭','基隆','台東','澎湖'];
+    const city=cities.find(c=>cmd.includes(c))||document.getElementById('weather-city').value.trim()||'';
+    const day=cmd.includes('明天')?1:0;
+    switchTab('morning');
+    speakFeedback(city?`好的 查詢${city}天氣 請稍等`:'好的 查詢天氣 請稍等');
+    setTimeout(()=>loadWeather(city,day,true),300);
+  }
+
   // ── 指定第X條分析（支援：條/則/個，中文數字/阿拉伯數字1-8，多種說法）─
   else if(/第[一二三四五六七八1-8][條則個]/.test(cmd)||
     /我對第[一二三四五六七八1-8]/.test(cmd)||
@@ -1694,6 +1843,13 @@ function executeVoiceCommand(cmd){
       voicePendingAdd=true;
       speakFeedback('好的 請說出要新增的待辦事項');
     }
+  }
+
+  // ── 晚間收尾簡報 ──────────────────────────────────────────────
+  else if(['今天怎麼樣','今天如何','今天結束','下班了','下班','收工','晚安','晚間簡報','今天狀況','今天回顧','工作回顧','今天總結'].some(w=>cmd.includes(w))){
+    if(_processingGuard){clearTimeout(_processingGuard);_processingGuard=null;}
+    _processingGuard=setTimeout(resetProcessingState,25000);
+    speakEveningBriefing();
   }
 
   // ── 歷史記錄 ──────────────────────────────────────────────────
@@ -2071,6 +2227,90 @@ async function generateWorkReview(){
     document.getElementById('review-result').style.display='block';
   }
   document.getElementById('review-loading').style.display='none';btn.disabled=false;
+}
+
+// ── 晚間收尾語音簡報 ─────────────────────────────────
+async function speakEveningBriefing(){
+  const now=new Date();
+  const h=now.getHours();
+  const todayStr=now.toISOString().split('T')[0];
+  const tomorrow=new Date(now); tomorrow.setDate(tomorrow.getDate()+1);
+  const tomorrowStr=tomorrow.toISOString().split('T')[0];
+  const dayAfter=new Date(now); dayAfter.setDate(dayAfter.getDate()+2);
+  const dayAfterStr=dayAfter.toISOString().split('T')[0];
+
+  const pending=todos.filter(t=>!t.done);
+  const overdue=pending.filter(t=>t.date&&t.date<todayStr);
+  const dueTomorrow=pending.filter(t=>t.date===tomorrowStr);
+  const dueDayAfter=pending.filter(t=>t.date===dayAfterStr);
+  const noDate=pending.filter(t=>!t.date);
+  const todayMtgs=meetings.filter(m=>{
+    const d=new Date(m.date);
+    return d.toISOString().split('T')[0]===todayStr;
+  });
+
+  const greeting=h<17?'下午了':h<19?'傍晚了':'晚上了';
+
+  // ── 有 API Key：用 AI 生成自然語言 ──
+  if(apiKey){
+    speakFeedback(`${greeting} bruce哥 幫你整理一下今天的狀況 請稍等`);
+    const completedDesc=_completedToday.length>0
+      ?_completedToday.slice(-5).map(t=>t.text).join('、')
+      :'本次開啟後尚未標記完成任何事項';
+    const pendingDesc=pending.slice(0,6).map(t=>t.text+(t.date?'（'+t.date+'）':'')).join('、')||'無';
+    try{
+      const res=await callGemini(
+        `你是鈞曜科技總經理bruce哥的AI秘書「刀疤」。現在時間：${h}點。請生成今晚的收尾語音簡報，規則：`+
+        `1.純文字，不用任何標點符號以外的符號，不用條列。`+
+        `2.用說話的口氣，語氣輕鬆親切。3.總長度控制在150字內。`+
+        `4.內容依序：問候→今日完成事項→明日需注意的事→一句鼓勵收尾。\n`+
+        `資料：本次完成（${_completedToday.length}件）：${completedDesc}。`+
+        `未完成（${pending.length}件）：${pendingDesc}。`+
+        `逾期（${overdue.length}件）：${overdue.slice(0,3).map(t=>t.text).join('、')||'無'}。`+
+        `明天待辦（${dueTomorrow.length}件）：${dueTomorrow.map(t=>t.text).join('、')||'無'}。`+
+        `今日會議：${todayMtgs.length}筆。`
+      );
+      const clean=res.replace(/[【】*#\n]+/g,' ').trim().slice(0,400);
+      speakChain(clean);
+    }catch(e){
+      _speakEveningSimple(greeting,pending,overdue,dueTomorrow,dueDayAfter);
+    }
+    return;
+  }
+
+  // ── 無 API Key：簡版 ──
+  _speakEveningSimple(greeting,pending,overdue,dueTomorrow,dueDayAfter);
+}
+
+function _speakEveningSimple(greeting,pending,overdue,dueTomorrow,dueDayAfter){
+  let parts=[];
+  parts.push(greeting+'，bruce哥。');
+
+  if(_completedToday.length>0){
+    parts.push(`今天完成了${_completedToday.length}件待辦，包括${_completedToday.slice(-3).map(t=>t.text).join('、')}，做得不錯。`);
+  }else{
+    parts.push('今天系統裡還沒有標記完成的事項。');
+  }
+
+  if(pending.length===0){
+    parts.push('所有待辦都清空了，今天太厲害了。');
+  }else{
+    if(overdue.length>0){
+      parts.push(`有${overdue.length}件逾期事項要注意：${overdue.slice(0,2).map(t=>t.text).join('、')}。`);
+    }
+    if(dueTomorrow.length>0){
+      parts.push(`明天有${dueTomorrow.length}件待辦需要處理：${dueTomorrow.map(t=>t.text).join('、')}，記得提早準備。`);
+    }else if(dueDayAfter.length>0){
+      parts.push(`後天有${dueDayAfter.length}件待辦：${dueDayAfter.map(t=>t.text).join('、')}。`);
+    }else if(pending.length>0){
+      parts.push(`目前還有${pending.length}件待辦未完成，明天繼續加油。`);
+    }
+  }
+
+  const endings=['今天辛苦了，好好休息。','工作再忙也要照顧自己，晚安。','今天辛苦了，放鬆一下吧。'];
+  parts.push(endings[Math.floor(Math.random()*endings.length)]);
+
+  speakChain(parts.join(''));
 }
 
 // ── ④ 智慧對話 ────────────────────────────────────
