@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>鈞曜科技 AI 秘書 v2.2</title>
+<title>鈞曜科技 AI 秘書 v2.4</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <style>
 :root {
@@ -209,7 +209,7 @@ input:focus { outline: none; border-color: var(--info) !important; }
     <div class="logo"><i class="ti ti-robot"></i></div>
     <div class="header-text">
       <h1>鈞曜科技 AI 秘書</h1>
-      <p>會議記錄 ・ 待辦追蹤 ・ 每日晨報 ・ Outlook &nbsp;<span style="font-size:11px;background:#22c55e22;color:#22c55e;border:1px solid #22c55e44;border-radius:20px;padding:1px 8px;vertical-align:middle">v2.2</span></p>
+      <p>會議記錄 ・ 待辦追蹤 ・ 每日晨報 ・ Outlook &nbsp;<span style="font-size:11px;background:#22c55e22;color:#22c55e;border:1px solid #22c55e44;border-radius:20px;padding:1px 8px;vertical-align:middle">v2.4</span></p>
     </div>
     <div class="header-right" style="display:flex;gap:8px;align-items:center">
       <div class="api-status ok" id="api-status"><i class="ti ti-check"></i> AI 已連線</div>
@@ -487,6 +487,8 @@ async function sbDelete(table,id){
 }
 
 let todos=[], meetings=[], currentFilter='all', lastExtractedTodos=[], apiKey=localStorage.getItem('jyste_groq_key')||'';
+let _voiceNewsItems=[];  // 儲存最近載入的新聞，供語音分析使用
+let _lastSpokenText='';  // 記住最後一句話，供「重複」指令使用
 const STORAGE_KEY_TODOS='jyste_todos_v3', STORAGE_KEY_MEETINGS='jyste_meetings_v3', STORAGE_KEY_API='jyste_groq_key';
 const weekdays=['日','一','二','三','四','五','六'];
 
@@ -601,7 +603,7 @@ function updateMorningStats(){
 
 const NEWS_API_KEY=localStorage.getItem('jyste_news_key')||'cc1b900baad94cd8bc2a69cc79739709';
 
-async function loadNews(){
+async function loadNews(voiceMode=false){
   const btn=document.getElementById('news-btn');
   btn.disabled=true;
   document.getElementById('news-container').innerHTML=`<div class="loading-box"><i class="ti ti-loader-2 spin" style="font-size:28px;display:block;margin-bottom:8px"></i>載入今日真實新聞中...</div>`;
@@ -679,6 +681,15 @@ async function loadNews(){
     }
 
     if(allNews.length===0){throw new Error('RSS 來源暫時無法連線，請稍後再試');}
+
+    _voiceNewsItems=allNews; // 儲存供語音分析使用
+
+    // 語音模式：載完後朗讀所有標題
+    if(voiceMode&&isAwake&&voiceCtrlActive){
+      const nums=['第一條','第二條','第三條','第四條','第五條','第六條','第七條','第八條'];
+      const titleText=allNews.map((n,i)=>`${nums[i]}：${n.title.split(' - ')[0]}`).join('。');
+      setTimeout(()=>speakFeedback('新聞載入完成，'+titleText+'。如有興趣請說第幾條分析'),800);
+    }
 
     document.getElementById('news-container').innerHTML=allNews.map((n,i)=>{
       const date=n.publishedAt?new Date(n.publishedAt).toLocaleDateString('zh-TW'):'';
@@ -1519,60 +1530,143 @@ function resetProcessingState(){
 
 function executeVoiceCommand(cmd){
   document.getElementById('voice-ctrl-status').textContent='執行中：'+cmd;
-  // 安全護衛：10 秒後強制重置（防止任何情況下的卡死）
   if(_processingGuard)clearTimeout(_processingGuard);
-  _processingGuard=setTimeout(resetProcessingState,10000);
+  _processingGuard=setTimeout(resetProcessingState,12000); // 一般指令12秒安全護衛
 
-  // 每日簡報
-  if(['簡報','播報','晨報','今天狀況','今天情況','日報','早報','早安報告','今天怎樣'].some(w=>cmd.includes(w))){
-    switchTab('morning');
-    setTimeout(()=>startSpeak(),300);
+  // ── 友善互動：打招呼 / 感謝 ──────────────────────────────────
+  if(['謝謝','謝了','感謝','辛苦了','多謝','謝你'].some(w=>cmd.includes(w))){
+    const r=['不客氣 bruce哥 有需要隨時說','這是我應該做的 有事盡管交給我','bruce哥太客氣了 我在這'];
+    speakFeedback(r[Math.floor(Math.random()*r.length)]);
   }
-  // 停止
-  else if(['停止','停','不用','暫停','結束播報','好了','夠了','不要說了'].some(w=>cmd.includes(w))){
+  else if(['你好','哈囉','嗨','早安','午安','晚安','在嗎','在不在','有空嗎'].some(w=>cmd.includes(w))){
+    const h=new Date().getHours();
+    const g=h<12?'早安':h<17?'午安':'晚安';
+    const r=[`${g} bruce哥 我在 有什麼需要幫忙的`,`${g} 我在這 請說`,`嗨 bruce哥 ${g} 有什麼事`];
+    speakFeedback(r[Math.floor(Math.random()*r.length)]);
+  }
+
+  // ── 重複最後一句 ──────────────────────────────────────────────
+  else if(['重複','再說一次','再說','沒聽到','什麼','你說什麼','聽不清楚'].some(w=>cmd.includes(w))){
+    if(_lastSpokenText){
+      speakFeedback(_lastSpokenText);
+    }else{
+      speakFeedback('剛才我還沒說任何話');
+    }
+  }
+
+  // ── 停止播報（放在新聞/簡報前，避免「停止播報」誤觸新聞）──────
+  else if(['停止','停下','可以了','不用了','結束播報','好了','夠了','不要說了'].some(w=>cmd.includes(w))
+    &&!['分析','新增','待辦','新聞','記錄'].some(w=>cmd.includes(w))){
     stopSpeak();
-    speakFeedback('好的 已停止');
+    speakFeedback('好 停了');
   }
-  // 新聞
-  else if(['新聞','消息','資訊','時事','今日新聞','載入新聞','看新聞'].some(w=>cmd.includes(w))){
+
+  // ── 每日簡報 ──────────────────────────────────────────────────
+  else if(['簡報','播報','晨報','今天狀況','今天情況','日報','早報','早安報告','今天怎樣','今天概況','今天重點','幫我報告','報告一下'].some(w=>cmd.includes(w))){
     switchTab('morning');
-    setTimeout(()=>loadNews(),300);
-    speakFeedback('好的 幫你載入今日新聞');
+    // 簡報有自己的 onend 處理，不需要安全護衛
+    setTimeout(()=>{
+      startSpeak();
+      if(_processingGuard){clearTimeout(_processingGuard);_processingGuard=null;}
+    },300);
   }
-  // 待辦
-  else if(['待辦','有什麼事','今天有什麼','工作清單','任務','事項','代辦','待辦事項','今天要做'].some(w=>cmd.includes(w))){
+
+  // ── 新聞（先判斷，避免「有什麼事」誤觸）─────────────────────
+  else if(['新聞','消息','時事','今日新聞','載入新聞','看新聞','最新消息','大事','新鮮事','有什麼新聞','今天新聞'].some(w=>cmd.includes(w))){
+    switchTab('morning');
+    setTimeout(()=>loadNews(true),300);
+    speakFeedback('好的 幫你載入今日新聞 載完後會朗讀標題');
+  }
+
+  // ── 指定第X條分析（支援：條/則/個，中文數字/阿拉伯數字1-8，多種說法）─
+  else if(/第[一二三四五六七八1-8][條則個]/.test(cmd)||
+    /我對第[一二三四五六七八1-8]/.test(cmd)||
+    /幫我分析第[一二三四五六七八1-8]/.test(cmd)||
+    /聽第[一二三四五六七八1-8]/.test(cmd)){
+    const numMap={'一':1,'二':2,'三':3,'四':4,'五':5,'六':6,'七':7,'八':8,
+      '1':1,'2':2,'3':3,'4':4,'5':5,'6':6,'7':7,'8':8};
+    const m=cmd.match(/第([一二三四五六七八1-8])/);
+    const idx=(numMap[m[1]]||1)-1;
+    const news=_voiceNewsItems[idx];
+    if(!news){
+      speakFeedback(_voiceNewsItems.length===0
+        ?'請先說「載入新聞」再選要分析哪條'
+        :'找不到這則 新聞只有'+_voiceNewsItems.length+'條');
+    }else if(!apiKey){
+      speakFeedback('分析功能需要先設定 API Key');
+    }else{
+      // 分析需要更長時間，延長護衛到20秒
+      if(_processingGuard){clearTimeout(_processingGuard);_processingGuard=null;}
+      _processingGuard=setTimeout(resetProcessingState,20000);
+      speakFeedback('好的 幫你分析第'+m[1]+'條 請稍等');
+      callGemini('請用繁體中文，用三到四句話說明以下新聞的重點，以及對台灣製造業或鈞曜科技的意義：'+news.title+'。'+news.summary)
+        .then(res=>{
+          const clean=res.replace(/[【】\*#]/g,'').trim();
+          speakFeedback(clean.slice(0,350));
+        })
+        .catch(()=>speakFeedback('分析失敗 請稍後再試'));
+    }
+  }
+
+  // ── 說了「分析」但沒指定第幾條 ───────────────────────────────
+  else if(cmd.includes('分析')){
+    if(_voiceNewsItems.length===0){
+      speakFeedback('請先說「載入新聞」再選要分析哪條');
+    }else{
+      speakFeedback('請說第幾條 例如 第一條 或 第二條');
+    }
+  }
+
+  // ── 待辦查詢（確認不含「新增」關鍵字）───────────────────────
+  else if(['待辦','有什麼事','工作清單','任務','事項','代辦','待辨','今天要做','有幾件','還有幾件','有幾個'].some(w=>cmd.includes(w))
+    &&!['新增','加入','幫我加','幫我記','記下'].some(w=>cmd.includes(w))){
     switchTab('todo');
     const pending=todos.filter(t=>!t.done);
     if(pending.length===0){
-      speakFeedback('目前沒有待辦事項');
+      speakFeedback('太棒了 目前沒有待辦 bruce哥可以輕鬆一下');
     }else{
-      speakFeedback(`目前有${pending.length}件待辦 已切換到待辦頁面`);
+      speakFeedback('目前還有'+pending.length+'件待辦 已切換到待辦頁面 加油');
     }
   }
-  // 會議記錄
-  else if(['開會','會議','記錄','會議記錄','開會記錄','會議紀錄','紀錄'].some(w=>cmd.includes(w))){
+
+  // ── 會議記錄（確認不含「新增」）─────────────────────────────
+  else if(['開會','會議','紀錄','會議記錄','會議紀錄','開會記錄','會議筆記'].some(w=>cmd.includes(w))
+    &&!['新增','加'].some(w=>cmd.includes(w))){
     switchTab('meeting');
     speakFeedback('好的 已切換到會議記錄');
   }
-  // 新增待辦（語音確認流程）
-  else if(['新增','加入','加','幫我加','幫我記','記下','新增待辦','加待辦'].some(w=>cmd.includes(w))){
-    const taskRaw=cmd.replace(/新增|加入|加|幫我加|幫我記|記下|待辦|事項/g,'').trim();
+
+  // ── 新增待辦 ──────────────────────────────────────────────────
+  else if(['新增','加入','幫我加','幫我記','記下','加待辦','新增待辦','記一下','提醒我'].some(w=>cmd.includes(w))){
+    const taskRaw=cmd.replace(/新增|加入|加|幫我加|幫我記|記下|待辦|事項|記一下|提醒我/g,'').trim();
     if(taskRaw.length>1){
       voiceAddTodo(taskRaw);
     }else{
-      // 沒有內容，提示說出事項
       voicePendingAdd=true;
       speakFeedback('好的 請說出要新增的待辦事項');
     }
   }
-  // 歷史記錄
-  else if(['歷史','歷史記錄','過去記錄','之前的記錄','舊記錄'].some(w=>cmd.includes(w))){
+
+  // ── 歷史記錄 ──────────────────────────────────────────────────
+  else if(['歷史','歷史記錄','過去','之前的記錄','舊記錄'].some(w=>cmd.includes(w))){
     switchTab('history');
     speakFeedback('好的 已切換到歷史記錄');
   }
-  // 不認識
+
+  // ── 未知指令：有 API Key 就交給 AI 回答，否則給提示 ──────────
   else{
-    speakFeedback('我不太清楚這個指令 你可以說 每日簡報 新增待辦 載入新聞 或是 待辦事項');
+    if(apiKey&&cmd.length>2){
+      if(_processingGuard){clearTimeout(_processingGuard);_processingGuard=null;}
+      _processingGuard=setTimeout(resetProcessingState,20000);
+      callGemini('你是鈞曜科技AI秘書刀疤。請用繁體中文，30字以內簡短回答（不要用條列）：'+cmd)
+        .then(res=>{
+          const clean=res.replace(/[【】\*#\n]/g,' ').trim().slice(0,200);
+          speakFeedback(clean);
+        })
+        .catch(()=>speakFeedback('我沒聽懂 可以說 每日簡報 載入新聞 或 新增待辦'));
+    }else{
+      speakFeedback('我沒聽懂 可以說 每日簡報 載入新聞 或 新增待辦');
+    }
   }
 }
 
@@ -1604,6 +1698,7 @@ function preprocessTTS(text){
 }
 
 function speakFeedback(text){
+  _lastSpokenText=text; // 記錄，供「重複」指令使用
   // 停止語音辨識，避免聽到自己的聲音
   if(voiceCtrlRecognition&&voiceCtrlActive){
     try{voiceCtrlRecognition.stop();}catch(e){}
