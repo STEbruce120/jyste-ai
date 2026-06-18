@@ -1580,23 +1580,28 @@ function speakFeedback(text){
   const tw=voices.find(v=>v.lang==='zh-TW')||voices.find(v=>v.lang.startsWith('zh'))||null;
   if(tw)utter.voice=tw;
 
-  utter.onend=()=>{
+  let feedbackDone=false;
+  const onFeedbackEnd=()=>{
+    if(feedbackDone)return;
+    feedbackDone=true;
+    clearTimeout(feedbackSafetyTimer);
     isProcessing=false;
-    // 任務完成後才重新開始 30 秒待命倒數
     if(isAwake&&voiceCtrlActive){
+      document.getElementById('voice-ctrl-status').textContent='刀疤已喚醒 請說指令 說「再見」結束對話';
       if(sleepTimeout)clearTimeout(sleepTimeout);
       sleepTimeout=setTimeout(()=>{
         setAwakeMode(false);
         speakFeedback('我先休息一下 需要的時候叫我');
       },30000);
     }
-    // 說完後恢復監聽
     if(voiceCtrlActive&&voiceCtrlRecognition){
-      setTimeout(()=>{
-        try{voiceCtrlRecognition.start();}catch(e){}
-      },400);
+      setTimeout(()=>{try{voiceCtrlRecognition.start();}catch(e){}},400);
     }
   };
+  utter.onend=onFeedbackEnd;
+  utter.onerror=onFeedbackEnd;
+  // 安全逾時：5 秒內若 TTS 沒有回應，強制重置
+  const feedbackSafetyTimer=setTimeout(onFeedbackEnd,5000);
 
   window.speechSynthesis.speak(utter);
 }
@@ -1641,8 +1646,11 @@ function setupRecognitionHandlers(){
           const wv=window.speechSynthesis.getVoices();
           const wtw=wv.find(v=>v.lang==='zh-TW')||wv.find(v=>v.lang.startsWith('zh'))||null;
           if(wtw)wakeUtter.voice=wtw;
-          wakeUtter.onend=()=>{
-            // 說完後設 1.5 秒冷卻再重啟，避免聽到自己聲音的尾音
+          let wakeDone=false;
+          const onWakeEnd=()=>{
+            if(wakeDone)return;
+            wakeDone=true;
+            clearTimeout(wakeSafetyTimer);
             voiceCooldown=true;
             setTimeout(()=>{
               voiceCooldown=false;
@@ -1651,6 +1659,9 @@ function setupRecognitionHandlers(){
               }
             },1500);
           };
+          wakeUtter.onend=onWakeEnd;
+          wakeUtter.onerror=onWakeEnd;
+          const wakeSafetyTimer=setTimeout(onWakeEnd,4000);
           window.speechSynthesis.cancel();
           window.speechSynthesis.speak(wakeUtter);
           document.getElementById('voice-ctrl-status').textContent='刀疤已喚醒 請說指令 說「再見」結束對話';
