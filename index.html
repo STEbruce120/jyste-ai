@@ -617,13 +617,12 @@ async function loadNews(){
       {cat:'國際財經',cls:'cat-global',url:'https://feeds.bbci.co.uk/news/business/rss.xml'}
     ];
     
-    const RSS_PROXY=`https://api.rss2json.com/v1/api.json?api_key=${NEWS_API_KEY}&rss_url=`;
+    const RSS_PROXY='https://api.rss2json.com/v1/api.json?rss_url=';
 
     for(const feed of rssFeeds){
       try{
-        const res=await fetch(RSS_PROXY+encodeURIComponent(feed.url)+'&count=3&order_by=pubDate');
+        const res=await fetch(RSS_PROXY+encodeURIComponent(feed.url)+'&count=3');
         const data=await res.json();
-        if(data.status==='error'){console.log('RSS API 錯誤:',feed.cat,data.message);continue;}
         if(data.items&&data.items.length>0){
           data.items.slice(0,3).forEach(item=>{
             allNews.push({
