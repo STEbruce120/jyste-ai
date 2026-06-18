@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>鈞曜科技 AI 秘書 v3.8</title>
+<title>鈞曜科技 AI 秘書 v3.9</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <style>
 :root {
@@ -209,7 +209,7 @@ input:focus { outline: none; border-color: var(--info) !important; }
     <div class="logo"><i class="ti ti-robot"></i></div>
     <div class="header-text">
       <h1>鈞曜科技 AI 秘書</h1>
-      <p>會議記錄 ・ 待辦追蹤 ・ 每日晨報 ・ Outlook &nbsp;<span style="font-size:11px;background:#22c55e22;color:#22c55e;border:1px solid #22c55e44;border-radius:20px;padding:1px 8px;vertical-align:middle">v3.8</span></p>
+      <p>會議記錄 ・ 待辦追蹤 ・ 每日晨報 ・ Outlook &nbsp;<span style="font-size:11px;background:#22c55e22;color:#22c55e;border:1px solid #22c55e44;border-radius:20px;padding:1px 8px;vertical-align:middle">v3.9</span></p>
     </div>
     <div class="header-right" style="display:flex;gap:8px;align-items:center">
       <div class="api-status ok" id="api-status"><i class="ti ti-check"></i> AI 已連線</div>
@@ -509,6 +509,7 @@ let _voiceNewsItems=[];  // 儲存最近載入的新聞，供語音分析使用
 let _lastSpokenText='';  // 記住最後一句話，供「重複」指令使用
 let _completedToday=[];  // 本次開啟後完成的待辦，供晚間簡報使用
 let isTTSSpeaking=false; // TTS 播報期間為 true，防止辨識在段落空隙誤收自己的聲音
+let _chainTookOver=false; // speakChain 主動取消 speakFeedback 時設為 true，避免 onerror 干擾
 const STORAGE_KEY_TODOS='jyste_todos_v3', STORAGE_KEY_MEETINGS='jyste_meetings_v3', STORAGE_KEY_API='jyste_groq_key';
 const weekdays=['日','一','二','三','四','五','六'];
 
@@ -1974,7 +1975,15 @@ function speakFeedback(text){
       setTimeout(()=>{try{voiceCtrlRecognition.start();}catch(e){}},400);
     }
   };
-  utter.onerror=utter.onend;
+  // onerror ≠ onend：被 speakChain 的 cancel() 中途取消時，
+  // _chainTookOver=true，此時不可重置 isTTSSpeaking（speakChain 已設為 true）。
+  utter.onerror=()=>{
+    if(_chainTookOver){_chainTookOver=false;return;} // speakChain 接管，讓它做清理
+    // 真正的 TTS 錯誤：做完整清理
+    isTTSSpeaking=false;
+    if(_processingGuard){clearTimeout(_processingGuard);_processingGuard=null;}
+    isProcessing=false;
+  };
 
   window.speechSynthesis.speak(utter);
 }
@@ -1984,6 +1993,7 @@ function speakFeedback(text){
 function speakChain(text){
   _lastSpokenText=text;
   isTTSSpeaking=true;  // 整段接力播報期間封鎖 recognition.onend
+  _chainTookOver=true; // 通知 speakFeedback.onerror：是我主動取消的，不要重置狀態
   if(sleepTimeout){clearTimeout(sleepTimeout);sleepTimeout=null;}
   if(voiceCtrlRecognition&&voiceCtrlActive){try{voiceCtrlRecognition.stop();}catch(e){}}
   window.speechSynthesis.cancel();
