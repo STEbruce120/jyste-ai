@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>鈞曜科技 AI 秘書 v3.0</title>
+<title>鈞曜科技 AI 秘書 v3.3</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <style>
 :root {
@@ -209,7 +209,7 @@ input:focus { outline: none; border-color: var(--info) !important; }
     <div class="logo"><i class="ti ti-robot"></i></div>
     <div class="header-text">
       <h1>鈞曜科技 AI 秘書</h1>
-      <p>會議記錄 ・ 待辦追蹤 ・ 每日晨報 ・ Outlook &nbsp;<span style="font-size:11px;background:#22c55e22;color:#22c55e;border:1px solid #22c55e44;border-radius:20px;padding:1px 8px;vertical-align:middle">v3.0</span></p>
+      <p>會議記錄 ・ 待辦追蹤 ・ 每日晨報 ・ Outlook &nbsp;<span style="font-size:11px;background:#22c55e22;color:#22c55e;border:1px solid #22c55e44;border-radius:20px;padding:1px 8px;vertical-align:middle">v3.3</span></p>
     </div>
     <div class="header-right" style="display:flex;gap:8px;align-items:center">
       <div class="api-status ok" id="api-status"><i class="ti ti-check"></i> AI 已連線</div>
@@ -647,14 +647,33 @@ function uvColor(uv){
   const n=parseInt(uv);
   if(n<=2)return'#22c55e';if(n<=5)return'#eab308';if(n<=7)return'#f97316';return'#ef4444';
 }
+function _isMobile(){
+  return /Android|webOS|iPhone|iPad|iPod|IEMobile|Opera Mini/i.test(navigator.userAgent)||
+    (navigator.maxTouchPoints>1&&window.innerWidth<=1024);
+}
 async function loadWeather(city='',dayOffset=0,voiceMode=false){
   const box=document.getElementById('weather-container');
   box.innerHTML='<div class="loading-box"><i class="ti ti-loader-2 spin" style="font-size:22px;display:block;margin-bottom:6px"></i>查詢天氣中...</div>';
+
+  // 決定查詢地點：1.手動輸入城市 > 2.行動裝置GPS > 3.預設台中
+  let resolvedQuery='';
+  if(city){
+    resolvedQuery=encodeURIComponent(city);
+  }else if(_isMobile()&&navigator.geolocation){
+    try{
+      const pos=await new Promise((res,rej)=>
+        navigator.geolocation.getCurrentPosition(res,rej,{timeout:5000,maximumAge:300000}));
+      resolvedQuery=`${pos.coords.latitude.toFixed(4)},${pos.coords.longitude.toFixed(4)}`;
+    }catch(e){
+      resolvedQuery=encodeURIComponent('台中'); // GPS 拒絕/逾時，回退台中
+    }
+  }else{
+    resolvedQuery=encodeURIComponent('台中'); // 桌機預設台中
+  }
+
   try{
-    // 優先使用輸入城市，否則嘗試 IP 定位（wttr.in 自動偵測）
-    const query=city?encodeURIComponent(city):'';
     const proxy='https://corsproxy.io/?';
-    const url=`${proxy}https://wttr.in/${query}?format=j1`;
+    const url=`${proxy}https://wttr.in/${resolvedQuery}?format=j1`;
     const resp=await fetch(url,{signal:AbortSignal.timeout(8000)});
     if(!resp.ok)throw new Error('查詢失敗');
     const data=await resp.json();
@@ -2249,7 +2268,7 @@ async function speakEveningBriefing(){
     return d.toISOString().split('T')[0]===todayStr;
   });
 
-  const greeting=h<17?'下午了':h<19?'傍晚了':'晚上了';
+  const greeting=h<18?'下午好':'晚上好';
 
   // ── 有 API Key：用 AI 生成自然語言 ──
   if(apiKey){
@@ -2263,7 +2282,7 @@ async function speakEveningBriefing(){
         `你是鈞曜科技總經理bruce哥的AI秘書「刀疤」。現在時間：${h}點。請生成今晚的收尾語音簡報，規則：`+
         `1.純文字，不用任何標點符號以外的符號，不用條列。`+
         `2.用說話的口氣，語氣輕鬆親切。3.總長度控制在150字內。`+
-        `4.內容依序：問候→今日完成事項→明日需注意的事→一句鼓勵收尾。\n`+
+        `4.內容依序：①時段問候（下午好或晚上好）→②今日完成事項→③逾期未完成提醒→④明天需要處理的待辦→⑤一句輕鬆鼓勵收尾。\n`+
         `資料：本次完成（${_completedToday.length}件）：${completedDesc}。`+
         `未完成（${pending.length}件）：${pendingDesc}。`+
         `逾期（${overdue.length}件）：${overdue.slice(0,3).map(t=>t.text).join('、')||'無'}。`+
