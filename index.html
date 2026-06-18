@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>鈞曜科技 AI 秘書 v2.1</title>
+<title>鈞曜科技 AI 秘書 v2.2</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <style>
 :root {
@@ -209,7 +209,7 @@ input:focus { outline: none; border-color: var(--info) !important; }
     <div class="logo"><i class="ti ti-robot"></i></div>
     <div class="header-text">
       <h1>鈞曜科技 AI 秘書</h1>
-      <p>會議記錄 ・ 待辦追蹤 ・ 每日晨報 ・ Outlook &nbsp;<span style="font-size:11px;background:#22c55e22;color:#22c55e;border:1px solid #22c55e44;border-radius:20px;padding:1px 8px;vertical-align:middle">v2.1</span></p>
+      <p>會議記錄 ・ 待辦追蹤 ・ 每日晨報 ・ Outlook &nbsp;<span style="font-size:11px;background:#22c55e22;color:#22c55e;border:1px solid #22c55e44;border-radius:20px;padding:1px 8px;vertical-align:middle">v2.2</span></p>
     </div>
     <div class="header-right" style="display:flex;gap:8px;align-items:center">
       <div class="api-status ok" id="api-status"><i class="ti ti-check"></i> AI 已連線</div>
@@ -609,18 +609,27 @@ async function loadNews(){
     // 直接解析 RSS XML（平行抓取，不依賴第三方 API key）
     let allNews=[];
 
+    // 每個類別設主要來源 + Google News 備援
+    const GN='https://news.google.com/rss/search?hl=zh-TW&gl=TW&ceid=TW:zh-Hant&q=';
     const rssFeeds=[
-      {cat:'台灣經濟/商業',cls:'cat-tw',   url:'https://www.bnext.com.tw/rss'},
-      {cat:'科技/AI',     cls:'cat-tech', url:'https://technews.tw/feed/'},
-      {cat:'製造業/自動化',cls:'cat-mfg',  url:'https://www.digitimes.com.tw/rss/rss.asp'},
-      {cat:'國際財經',    cls:'cat-global',url:'https://ec.ltn.com.tw/rss/business.xml'}
+      {cat:'台灣經濟/商業',cls:'cat-tw',
+       urls:['https://www.bnext.com.tw/rss',
+             GN+encodeURIComponent('台灣 商業 經濟')]},
+      {cat:'科技/AI',cls:'cat-tech',
+       urls:['https://technews.tw/feed/',
+             GN+encodeURIComponent('AI 人工智慧 科技')]},
+      {cat:'製造業/自動化',cls:'cat-mfg',
+       urls:['https://www.digitimes.com.tw/rss/rss.asp',
+             GN+encodeURIComponent('製造業 自動化 台灣')]},
+      {cat:'國際財經',cls:'cat-global',
+       urls:['https://ec.ltn.com.tw/rss/business.xml',
+             GN+encodeURIComponent('國際 財經 金融')]}
     ];
 
-    // 以 corsproxy.io 為主，allorigins 為備援
-    async function fetchRSS(feedUrl){
+    async function fetchRSS(url){
       const proxies=[
-        `https://corsproxy.io/?${encodeURIComponent(feedUrl)}`,
-        `https://api.allorigins.win/raw?url=${encodeURIComponent(feedUrl)}`
+        `https://corsproxy.io/?${encodeURIComponent(url)}`,
+        `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`
       ];
       for(const proxy of proxies){
         try{
@@ -628,32 +637,34 @@ async function loadNews(){
           if(!r.ok)continue;
           const txt=await r.text();
           const xml=new DOMParser().parseFromString(txt,'text/xml');
-          if(xml.querySelector('parsererror'))continue;
-          return xml;
-        }catch(e){continue;}
+          if(!xml.querySelector('parsererror'))return xml;
+        }catch(e){}
       }
       return null;
     }
 
-    function parseItems(xml,feed){
-      const items=[...xml.querySelectorAll('item')].slice(0,2);
-      const chanTitle=xml.querySelector('channel>title')?.textContent||feed.cat;
-      return items.map(item=>{
-        const title=item.querySelector('title')?.textContent?.trim()||'';
-        if(!title)return null;
-        const link=item.querySelector('link')?.textContent?.trim()||
-                   item.querySelector('link')?.nextSibling?.textContent?.trim()||'';
-        const desc=(item.querySelector('description')?.textContent||'').replace(/<[^>]*>/g,'').trim().slice(0,120);
-        const pub=item.querySelector('pubDate')?.textContent||'';
-        return {cat:feed.cat,cls:feed.cls,title,source:chanTitle,summary:desc,url:link,publishedAt:pub};
-      }).filter(Boolean);
+    async function fetchFeed(feed){
+      for(const url of feed.urls){
+        const xml=await fetchRSS(url);
+        if(!xml)continue;
+        const items=[...xml.querySelectorAll('item')].slice(0,2);
+        const chanTitle=xml.querySelector('channel>title')?.textContent||feed.cat;
+        const parsed=items.map(item=>{
+          const title=item.querySelector('title')?.textContent?.trim()||'';
+          if(!title)return null;
+          const link=item.querySelector('link')?.textContent?.trim()||
+                     item.querySelector('link')?.nextSibling?.textContent?.trim()||'';
+          const desc=(item.querySelector('description')?.textContent||'').replace(/<[^>]*>/g,'').trim().slice(0,120);
+          const pub=item.querySelector('pubDate')?.textContent||'';
+          return {cat:feed.cat,cls:feed.cls,title,source:chanTitle,summary:desc,url:link,publishedAt:pub};
+        }).filter(Boolean);
+        if(parsed.length>0)return parsed;
+      }
+      return [];
     }
 
     // 四條 RSS 同時平行抓取
-    const fetched=await Promise.allSettled(rssFeeds.map(async feed=>{
-      const xml=await fetchRSS(feed.url);
-      return xml?parseItems(xml,feed):[];
-    }));
+    const fetched=await Promise.allSettled(rssFeeds.map(fetchFeed));
     fetched.forEach(r=>{if(r.status==='fulfilled')allNews.push(...r.value);});
 
     // RSS 全部失敗時，用 Groq AI 補充（需有 API Key）
