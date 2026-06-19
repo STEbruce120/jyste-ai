@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>鈞曜科技 AI 秘書 v3.11</title>
+<title>鈞曜科技 AI 秘書 v3.12</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
 <style>
@@ -480,6 +480,24 @@ input:focus { outline: none; border-color: var(--info) !important; }
           <i class="ti ti-check"></i> 想法已整理完成
         </div>
         <div id="idea-result-content" style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:14px;font-size:14px;line-height:1.8;white-space:pre-wrap;margin-bottom:12px"></div>
+        <!-- 風格選擇 -->
+        <div style="margin-bottom:12px">
+          <div style="font-size:12px;color:var(--text2);margin-bottom:8px"><i class="ti ti-palette"></i> 選擇簡報風格</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button id="theme-btn-dark" onclick="setIdeaTheme('dark')"
+              style="padding:8px 14px;background:#1C2B5E;color:#C7D7FE;border:2px solid #4B7BF5;border-radius:8px;font-size:13px;cursor:pointer">
+              🌑 專業深色
+            </button>
+            <button id="theme-btn-light" onclick="setIdeaTheme('light')"
+              style="padding:8px 14px;background:#fff;color:#2563EB;border:2px solid #d1d5db;border-radius:8px;font-size:13px;cursor:pointer">
+              ☀️ 現代簡潔
+            </button>
+            <button id="theme-btn-vivid" onclick="setIdeaTheme('vivid')"
+              style="padding:8px 14px;background:#7C3AED;color:#FDE68A;border:2px solid #d1d5db;border-radius:8px;font-size:13px;cursor:pointer">
+              🎨 活潑鮮豔
+            </button>
+          </div>
+        </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           <button onclick="downloadIdeaPPTX()" style="padding:10px 20px;background:#22c55e;color:#fff;border:none;border-radius:8px;font-size:14px;cursor:pointer;display:flex;align-items:center;gap:6px">
             <i class="ti ti-presentation"></i> 下載簡報（PPTX）
@@ -2478,6 +2496,7 @@ let _ideaAnswer='';     // 補充回答
 let _ideaStructured=''; // 整理後的結構
 let _ideaSlides=null;   // 簡報資料（JSON）
 let _ideaMode=null;     // null|'capture'|'clarify'|'done'
+let _ideaTheme='dark';  // 簡報風格：dark|light|vivid
 
 function setIdeaStatus(text,icon='ti-microphone-2'){
   document.getElementById('idea-status-text').textContent=text;
@@ -2580,77 +2599,128 @@ function clearIdea(){
   setIdeaStatus('說「我有個想法」或在下方輸入你的創意','ti-microphone-2');
 }
 
+function setIdeaTheme(theme){
+  _ideaTheme=theme;
+  ['dark','light','vivid'].forEach(t=>{
+    const b=document.getElementById('theme-btn-'+t);
+    if(b)b.style.outline=t===theme?'3px solid #22c55e':'none';
+  });
+  showToast({dark:'🌑 已選擇：專業深色',light:'☀️ 已選擇：現代簡潔',vivid:'🎨 已選擇：活潑鮮豔'}[theme]);
+}
+
 async function downloadIdeaPPTX(){
   if(!window.PptxGenJS){showToast('⚠️ 簡報套件載入中，請稍後再試');return;}
-  const slides=_ideaSlides;
-  if(!slides||!slides.slides){showToast('⚠️ 沒有可用的簡報資料');return;}
+  const data=_ideaSlides;
+  if(!data||!data.slides||data.slides.length===0){showToast('⚠️ 沒有可用的簡報資料');return;}
 
-  showToast('⏳ 正在產生簡報...');
+  // ── 主題色彩表 ──
+  const THEMES={
+    dark:{cover:'1C2B5E',bar:'1C2B5E',content:'FFFFFF',alt:'EEF2FF',end:'1C2B5E',
+          accent:'4B7BF5',accentL:'C7D7FE',white:'FFFFFF',dark:'1F2937',gray:'6B7280',
+          bullet:'1C2B5E',sidebar:'4B7BF5',summBox:'EEF2FF',summLine:'4B7BF5'},
+    light:{cover:'2563EB',bar:'2563EB',content:'FFFFFF',alt:'F0F7FF',end:'1E3A8A',
+           accent:'2563EB',accentL:'BFDBFE',white:'FFFFFF',dark:'1F2937',gray:'6B7280',
+           bullet:'2563EB',sidebar:'2563EB',summBox:'F0F7FF',summLine:'2563EB'},
+    vivid:{cover:'7C3AED',bar:'7C3AED',content:'FFFFFF',alt:'F5F3FF',end:'6D28D9',
+           accent:'F59E0B',accentL:'FDE68A',white:'FFFFFF',dark:'1F2937',gray:'6B7280',
+           bullet:'7C3AED',sidebar:'F59E0B',summBox:'FFF7ED',summLine:'F59E0B'}
+  };
+  const t=THEMES[_ideaTheme]||THEMES.dark;
+  const JH='Microsoft JhengHei';
+
+  showToast('⏳ 正在產生高品質簡報...');
   try{
     const pptx=new window.PptxGenJS();
     pptx.layout='LAYOUT_16x9';
-    pptx.title=slides.title||'鈞曜創意提案';
-
-    // 色彩主題（深藍專業風）
-    const C_BG='1E2761'; const C_ACCENT='CADCFC'; const C_WHITE='FFFFFF';
-    const C_DARK='0D1440'; const C_GRAY='8895B3';
-
-    // ── 封面投影片 ──
-    const cover=pptx.addSlide();
-    cover.background={color:C_BG};
-    cover.addShape(pptx.ShapeType.rect,{x:0,y:3.8,w:10,h:1.8,fill:{color:C_DARK},line:{color:C_DARK}});
-    cover.addText(slides.title||'創意提案',{
-      x:0.5,y:0.8,w:9,h:2,fontSize:40,bold:true,color:C_WHITE,align:'center',fontFace:'Microsoft JhengHei'
-    });
-    cover.addText(slides.subtitle||'鈞曜科技',{
-      x:0.5,y:3.9,w:9,h:0.8,fontSize:20,color:C_ACCENT,align:'center',fontFace:'Microsoft JhengHei'
-    });
+    pptx.title=data.title||'鈞曜創意提案';
     const now=new Date();
-    cover.addText(`${now.getFullYear()}年${now.getMonth()+1}月${now.getDate()}日`,{
-      x:0.5,y:4.8,w:9,h:0.5,fontSize:13,color:C_GRAY,align:'center',fontFace:'Microsoft JhengHei'
+    const dateStr=`${now.getFullYear()}年${now.getMonth()+1}月${now.getDate()}日`;
+
+    // ══ 1. 封面 ══
+    const cover=pptx.addSlide();
+    cover.background={color:t.cover};
+    // 頂部細線
+    cover.addShape(pptx.ShapeType.rect,{x:0,y:0,w:10,h:0.1,fill:{color:t.accent},line:{color:t.accent}});
+    // 底部暗色區
+    cover.addShape(pptx.ShapeType.rect,{x:0,y:4.2,w:10,h:1.425,fill:{color:'00000033'},line:{color:'00000033'}});
+    // 公司名
+    cover.addText('鈞曜科技有限公司',{x:0.6,y:0.25,w:9,h:0.45,fontSize:13,color:t.accentL,align:'left',fontFace:JH});
+    // 主標題
+    cover.addText(data.title||'創意提案',{x:0.6,y:1.0,w:8.8,h:2.2,fontSize:44,bold:true,color:t.white,align:'left',wrap:true,fontFace:JH});
+    // 副標題
+    cover.addText(data.subtitle||'',{x:0.6,y:3.3,w:8.8,h:0.75,fontSize:19,color:t.accentL,align:'left',fontFace:JH});
+    // 日期
+    cover.addText(dateStr,{x:0.6,y:4.5,w:5,h:0.4,fontSize:12,color:t.gray,fontFace:JH});
+    // 左側裝飾線
+    cover.addShape(pptx.ShapeType.rect,{x:0,y:0.1,w:0.06,h:4.1,fill:{color:t.accentL},line:{color:t.accentL}});
+
+    // ══ 2. 議程 ══
+    const agenda=pptx.addSlide();
+    agenda.background={color:t.content};
+    agenda.addShape(pptx.ShapeType.rect,{x:0,y:0,w:0.12,h:5.625,fill:{color:t.sidebar},line:{color:t.sidebar}});
+    agenda.addShape(pptx.ShapeType.rect,{x:0.12,y:0,w:9.88,h:1.1,fill:{color:t.alt},line:{color:t.alt}});
+    agenda.addText('議程',{x:0.4,y:0.15,w:3,h:0.8,fontSize:32,bold:true,color:t.dark,fontFace:JH});
+    agenda.addText('AGENDA',{x:3.5,y:0.25,w:3,h:0.65,fontSize:14,color:t.accent,fontFace:'Arial',italic:true});
+    data.slides.forEach((s,i)=>{
+      const yp=1.25+i*0.68;
+      agenda.addShape(pptx.ShapeType.ellipse,{x:0.35,y:yp+0.05,w:0.42,h:0.42,fill:{color:t.bullet},line:{color:t.bullet}});
+      agenda.addText(String(i+1),{x:0.35,y:yp+0.05,w:0.42,h:0.42,fontSize:13,bold:true,color:t.white,align:'center',valign:'middle',margin:0,fontFace:JH});
+      agenda.addText(s.title||'',{x:0.9,y:yp,w:8.7,h:0.55,fontSize:17,color:t.dark,valign:'middle',fontFace:JH});
     });
 
-    // ── 內容投影片 ──
-    slides.slides.forEach((s,idx)=>{
+    // ══ 3. 內容投影片 ══
+    data.slides.forEach((s,idx)=>{
       const slide=pptx.addSlide();
-      const isEven=idx%2===0;
-      slide.background={color:isEven?'F8FAFF':C_WHITE};
-
-      // 標題背景條
-      slide.addShape(pptx.ShapeType.rect,{x:0,y:0,w:10,h:1.1,fill:{color:C_BG},line:{color:C_BG}});
-      // 頁碼
-      slide.addShape(pptx.ShapeType.ellipse,{x:9.1,y:0.15,w:0.7,h:0.7,fill:{color:C_ACCENT},line:{color:C_ACCENT}});
-      slide.addText(String(idx+1),{x:9.1,y:0.15,w:0.7,h:0.7,fontSize:14,bold:true,color:C_BG,align:'center',valign:'middle',fontFace:'Microsoft JhengHei'});
-      // 標題
-      slide.addText(s.title||'',{
-        x:0.4,y:0.05,w:8.5,h:1,fontSize:24,bold:true,color:C_WHITE,valign:'middle',fontFace:'Microsoft JhengHei'
+      slide.background={color:idx%2===0?t.content:t.alt};
+      // 頂部標題條
+      slide.addShape(pptx.ShapeType.rect,{x:0,y:0,w:10,h:1.05,fill:{color:t.bar},line:{color:t.bar}});
+      // 頁碼圓形
+      slide.addShape(pptx.ShapeType.ellipse,{x:9.1,y:0.18,w:0.6,h:0.6,fill:{color:t.accent},line:{color:t.accent}});
+      slide.addText(String(idx+1),{x:9.1,y:0.18,w:0.6,h:0.6,fontSize:12,bold:true,color:t.white,align:'center',valign:'middle',margin:0,fontFace:JH});
+      // 標題文字
+      slide.addText(s.title||'',{x:0.4,y:0.05,w:8.5,h:0.95,fontSize:24,bold:true,color:t.white,valign:'middle',fontFace:JH});
+      // 內容重點（編號圓圈+文字）
+      const pts=(s.points||[]).slice(0,5);
+      pts.forEach((p,i)=>{
+        const yp=1.2+i*0.82;
+        slide.addShape(pptx.ShapeType.ellipse,{x:0.4,y:yp+0.1,w:0.38,h:0.38,fill:{color:t.bullet},line:{color:t.bullet}});
+        slide.addText(String(i+1),{x:0.4,y:yp+0.1,w:0.38,h:0.38,fontSize:12,bold:true,color:t.white,align:'center',valign:'middle',margin:0,fontFace:JH});
+        slide.addText(p,{x:0.95,y:yp,w:8.6,h:0.65,fontSize:15,color:t.dark,valign:'middle',wrap:true,fontFace:JH});
       });
-
-      // 內容重點
-      const points=(s.points||[]).slice(0,6);
-      const bulletItems=points.map((p,i)=>({
-        text:p,
-        options:{bullet:{characterCode:'25CF',color:C_BG,indent:10},breakLine:i<points.length-1,
-          fontSize:16,color:'333333',fontFace:'Microsoft JhengHei'}
-      }));
-      if(bulletItems.length>0){
-        slide.addText(bulletItems,{x:0.5,y:1.3,w:9,h:4,valign:'top',margin:4});
-      }
     });
 
-    // ── 結尾投影片 ──
-    const end=pptx.addSlide();
-    end.background={color:C_BG};
-    end.addText('謝謝聆聽',{x:0.5,y:1.5,w:9,h:1.5,fontSize:44,bold:true,color:C_WHITE,align:'center',fontFace:'Microsoft JhengHei'});
-    end.addText(slides.title||'創意提案',{x:0.5,y:3.2,w:9,h:0.8,fontSize:18,color:C_ACCENT,align:'center',fontFace:'Microsoft JhengHei'});
-    end.addText('鈞曜科技有限公司',{x:0.5,y:4.1,w:9,h:0.5,fontSize:13,color:C_GRAY,align:'center',fontFace:'Microsoft JhengHei'});
+    // ══ 4. 摘要 ══
+    const sumSlide=pptx.addSlide();
+    sumSlide.background={color:t.alt};
+    sumSlide.addShape(pptx.ShapeType.rect,{x:0,y:0,w:10,h:1.05,fill:{color:t.bar},line:{color:t.bar}});
+    sumSlide.addText('重點摘要',{x:0.4,y:0.05,w:8,h:0.95,fontSize:24,bold:true,color:t.white,valign:'middle',fontFace:JH});
+    sumSlide.addText('KEY TAKEAWAYS',{x:5.5,y:0.22,w:4,h:0.65,fontSize:12,color:t.accentL,align:'right',italic:true,fontFace:'Arial'});
+    const sumItems=data.slides.slice(0,4);
+    sumItems.forEach((s,i)=>{
+      const col=i%2; const row=Math.floor(i/2);
+      const bx=0.4+col*4.9; const by=1.2+row*1.95;
+      sumSlide.addShape(pptx.ShapeType.rect,{x:bx,y:by,w:4.5,h:1.75,fill:{color:t.summBox},line:{color:t.summLine,pt:1.5}});
+      sumSlide.addShape(pptx.ShapeType.rect,{x:bx,y:by,w:4.5,h:0.45,fill:{color:t.bullet},line:{color:t.bullet}});
+      sumSlide.addText(s.title||'',{x:bx+0.1,y:by+0.02,w:4.3,h:0.41,fontSize:13,bold:true,color:t.white,valign:'middle',margin:2,fontFace:JH});
+      sumSlide.addText((s.points||[])[0]||'',{x:bx+0.1,y:by+0.5,w:4.3,h:1.1,fontSize:13,color:t.dark,valign:'top',wrap:true,margin:4,fontFace:JH});
+    });
 
-    const filename=`鈞曜_${(slides.title||'創意提案').slice(0,10)}_${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}.pptx`;
-    await pptx.writeFile({fileName:filename});
+    // ══ 5. 結尾 ══
+    const end=pptx.addSlide();
+    end.background={color:t.end};
+    end.addShape(pptx.ShapeType.rect,{x:0,y:0,w:10,h:0.1,fill:{color:t.accent},line:{color:t.accent}});
+    end.addShape(pptx.ShapeType.rect,{x:3.5,y:2.85,w:3,h:0.06,fill:{color:t.accentL},line:{color:t.accentL}});
+    end.addText('謝謝聆聽',{x:0.5,y:1.2,w:9,h:1.5,fontSize:52,bold:true,color:t.white,align:'center',fontFace:JH});
+    end.addText(data.title||'創意提案',{x:0.5,y:3.1,w:9,h:0.75,fontSize:18,color:t.accentL,align:'center',fontFace:JH});
+    end.addText('鈞曜科技有限公司　'+dateStr,{x:0.5,y:4.7,w:9,h:0.4,fontSize:12,color:t.gray,align:'center',fontFace:JH});
+
+    const fname=`鈞曜_${(data.title||'創意提案').slice(0,10)}_${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}.pptx`;
+    await pptx.writeFile({fileName:fname});
     showToast('✅ 簡報已下載！');
     if(isAwake&&voiceCtrlActive) speakFeedback('簡報已下載完成');
   }catch(e){
     showToast('⚠️ 簡報產生失敗：'+e.message);
+    console.error(e);
   }
 }
 
