@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>鈞曜科技 AI 秘書 v3.13</title>
+<title>鈞曜科技 AI 秘書 v3.14</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
 <style>
@@ -99,6 +99,7 @@ input:focus { outline: none; border-color: var(--info) !important; }
 .loading-box { text-align: center; padding: 2.5rem; color: var(--text2); }
 .spin { animation: spin 1s linear infinite; display: inline-block; }
 @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+@keyframes blink { 0%,80%,100%{opacity:.2} 40%{opacity:1} }
 
 /* Stats */
 .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 1rem; }
@@ -436,96 +437,72 @@ input:focus { outline: none; border-color: var(--info) !important; }
   <div id="tab-idea" class="section">
     <div class="card">
       <div class="card-title">
-        <div class="card-title-left"><i class="ti ti-bulb" style="color:#f59e0b"></i> 創意捕捉工坊</div>
-        <span style="font-size:11px;color:var(--text2)">說「我有個想法」或直接輸入</span>
+        <div class="card-title-left"><i class="ti ti-messages" style="color:#f59e0b"></i> 創意討論室</div>
+        <span style="font-size:11px;color:var(--text2)">和刀疤一起討論，讓想法更完整</span>
       </div>
 
-      <!-- 狀態提示 -->
-      <div id="idea-status" style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:13px;color:var(--text2);display:flex;align-items:center;gap:8px">
-        <i class="ti ti-microphone-2" style="color:#f59e0b"></i>
-        <span id="idea-status-text">說「我有個想法」或在下方輸入你的創意</span>
+      <!-- 狀態列 -->
+      <div id="idea-status" style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:9px 14px;margin-bottom:10px;font-size:13px;color:var(--text2);display:flex;align-items:center;gap:8px">
+        <i class="ti ti-bulb" style="color:#f59e0b"></i>
+        <span id="idea-status-text">說出你的想法，刀疤會提出看法和問題，一起把想法變具體</span>
       </div>
 
-      <!-- 輸入區 -->
-      <div style="display:flex;gap:8px;margin-bottom:12px">
-        <textarea id="idea-input" placeholder="在這裡輸入你的想法（不完整也沒關係）..." rows="3"
-          style="flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px;color:var(--text);font-size:14px;resize:vertical;font-family:inherit"></textarea>
-        <div style="display:flex;flex-direction:column;gap:6px">
-          <button onclick="startIdeaCapture()" style="padding:8px 14px;background:#f59e0b;color:#000;border:none;border-radius:8px;font-size:13px;cursor:pointer;white-space:nowrap">
-            <i class="ti ti-wand"></i> 開始發展
-          </button>
-          <button onclick="clearIdea()" style="padding:8px 14px;background:var(--bg3);border:1px solid var(--border);color:var(--text2);border-radius:8px;font-size:13px;cursor:pointer">
-            <i class="ti ti-trash"></i> 清除
-          </button>
-        </div>
-      </div>
-
-      <!-- 對話區（釐清問題） -->
-      <div id="idea-qa-area" style="display:none;margin-bottom:12px">
-        <div style="font-size:13px;color:var(--warning);margin-bottom:8px;display:flex;align-items:center;gap:6px">
-          <i class="ti ti-help-circle"></i> 刀疤想多了解一下
-        </div>
-        <div id="idea-question" style="background:#451a0322;border:1px solid #f59e0b44;border-radius:8px;padding:12px;font-size:14px;color:var(--text);margin-bottom:8px"></div>
-        <div style="display:flex;gap:8px">
-          <input id="idea-answer" type="text" placeholder="你的回答..." style="flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-size:14px">
-          <button onclick="submitIdeaAnswer()" style="padding:8px 16px;background:var(--info);color:#fff;border:none;border-radius:8px;font-size:13px;cursor:pointer">
-            <i class="ti ti-send"></i> 送出
-          </button>
-        </div>
-      </div>
-
-      <!-- 結構化結果 -->
-      <div id="idea-result-area" style="display:none">
-        <div style="font-size:13px;color:var(--success);margin-bottom:8px;display:flex;align-items:center;gap:6px">
-          <i class="ti ti-check"></i> 想法已整理完成
-        </div>
-        <div id="idea-result-content" style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:14px;font-size:14px;line-height:1.8;white-space:pre-wrap;margin-bottom:12px"></div>
-        <!-- 風格選擇 -->
-        <div style="margin-bottom:12px">
-          <div style="font-size:12px;color:var(--text2);margin-bottom:8px"><i class="ti ti-palette"></i> 選擇簡報風格</div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap">
-            <button id="theme-btn-dark" onclick="setIdeaTheme('dark')"
-              style="padding:8px 14px;background:#1C2B5E;color:#C7D7FE;border:2px solid #4B7BF5;border-radius:8px;font-size:13px;cursor:pointer">
-              🌑 專業深色
-            </button>
-            <button id="theme-btn-light" onclick="setIdeaTheme('light')"
-              style="padding:8px 14px;background:#fff;color:#2563EB;border:2px solid #d1d5db;border-radius:8px;font-size:13px;cursor:pointer">
-              ☀️ 現代簡潔
-            </button>
-            <button id="theme-btn-vivid" onclick="setIdeaTheme('vivid')"
-              style="padding:8px 14px;background:#7C3AED;color:#FDE68A;border:2px solid #d1d5db;border-radius:8px;font-size:13px;cursor:pointer">
-              🎨 活潑鮮豔
-            </button>
+      <!-- 對話泡泡區 -->
+      <div id="idea-chat-area" style="height:340px;overflow-y:auto;background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:10px;display:flex;flex-direction:column;gap:10px">
+        <div class="idea-empty-state" style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:var(--text2);font-size:13px;gap:10px">
+          <i class="ti ti-bulb" style="font-size:32px;color:#f59e0b"></i>
+          <div style="text-align:center;line-height:1.8">
+            輸入你的想法，刀疤會：<br>
+            ① 給你看法和意見　② 上網查相關資料　③ 問關鍵問題
           </div>
         </div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <button onclick="downloadIdeaPPTX()" style="padding:10px 20px;background:#22c55e;color:#fff;border:none;border-radius:8px;font-size:14px;cursor:pointer;display:flex;align-items:center;gap:6px">
-            <i class="ti ti-presentation"></i> 下載簡報（PPTX）
-          </button>
-          <button onclick="copyForGamma()" style="padding:10px 20px;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;border:none;border-radius:8px;font-size:14px;cursor:pointer;display:flex;align-items:center;gap:6px">
-            <i class="ti ti-copy"></i> 複製大綱給 Gamma
-          </button>
-          <button onclick="refineIdea()" style="padding:10px 20px;background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:8px;font-size:14px;cursor:pointer">
-            <i class="ti ti-refresh"></i> 繼續補充
-          </button>
-        </div>
-        <!-- Gamma 操作說明（複製後顯示） -->
-        <div id="gamma-hint" style="display:none;margin-top:12px;background:#1e1b4b;border:1px solid #6366f1;border-radius:8px;padding:12px 14px;font-size:13px;color:#c7d2fe;line-height:1.8">
-          <div style="font-weight:bold;margin-bottom:6px;color:#a5b4fc">✅ 大綱已複製！接下來：</div>
-          <div>1. 點下方按鈕開啟 Gamma.app</div>
-          <div>2. 點「New」→「Paste in text」</div>
-          <div>3. 貼上（Ctrl+V）→ 選主題風格 → 按「Generate」</div>
-          <div>4. 幾秒後就是一份專業簡報 🎉</div>
-          <a href="https://gamma.app" target="_blank"
-            style="display:inline-block;margin-top:10px;padding:8px 18px;background:#6366f1;color:#fff;border-radius:6px;text-decoration:none;font-size:13px">
-            <i class="ti ti-external-link"></i> 開啟 Gamma.app
-          </a>
-        </div>
       </div>
 
-      <!-- Loading -->
-      <div id="idea-loading" style="display:none;text-align:center;padding:20px;color:var(--text2)">
-        <i class="ti ti-loader-2 spin"></i> 刀疤正在整理你的想法...
+      <!-- 輸入列 -->
+      <div style="display:flex;gap:8px;margin-bottom:10px">
+        <input id="idea-chat-input" type="text" placeholder="輸入想法或回應刀疤的問題... (Enter 送出)"
+          onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendIdeaMessage();}"
+          style="flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px 14px;color:var(--text);font-size:14px">
+        <button onclick="sendIdeaMessage()" style="padding:10px 16px;background:#f59e0b;color:#000;border:none;border-radius:8px;font-size:14px;cursor:pointer" title="送出">
+          <i class="ti ti-send"></i>
+        </button>
+        <button onclick="clearIdea()" style="padding:10px 12px;background:var(--bg3);border:1px solid var(--border);color:var(--text2);border-radius:8px;font-size:13px;cursor:pointer" title="清除重來">
+          <i class="ti ti-trash"></i>
+        </button>
+      </div>
+
+      <!-- 整理 & 下載區（討論2輪後出現） -->
+      <div id="idea-finalize-area" style="display:none;border-top:1px solid var(--border);padding-top:12px">
+        <!-- 整理按鈕 -->
+        <div id="idea-finalize-btn-wrap" style="margin-bottom:10px">
+          <button onclick="finalizeIdea()" style="width:100%;padding:11px;background:linear-gradient(135deg,#f59e0b,#d97706);color:#000;border:none;border-radius:8px;font-size:14px;font-weight:bold;cursor:pointer">
+            <i class="ti ti-sparkles"></i> 整理成簡報大綱
+          </button>
+        </div>
+        <!-- 下載區（整理後出現） -->
+        <div id="idea-ready-section" style="display:none">
+          <div style="font-size:12px;color:var(--text2);margin-bottom:8px"><i class="ti ti-palette"></i> 選擇簡報風格</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+            <button id="theme-btn-dark" onclick="setIdeaTheme('dark')" style="padding:7px 13px;background:#1C2B5E;color:#C7D7FE;border:2px solid #4B7BF5;border-radius:8px;font-size:13px;cursor:pointer">🌑 專業深色</button>
+            <button id="theme-btn-light" onclick="setIdeaTheme('light')" style="padding:7px 13px;background:#fff;color:#2563EB;border:2px solid #d1d5db;border-radius:8px;font-size:13px;cursor:pointer">☀️ 現代簡潔</button>
+            <button id="theme-btn-vivid" onclick="setIdeaTheme('vivid')" style="padding:7px 13px;background:#7C3AED;color:#FDE68A;border:2px solid #d1d5db;border-radius:8px;font-size:13px;cursor:pointer">🎨 活潑鮮豔</button>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button onclick="downloadIdeaPPTX()" style="padding:10px 18px;background:#22c55e;color:#fff;border:none;border-radius:8px;font-size:14px;cursor:pointer;display:flex;align-items:center;gap:6px">
+              <i class="ti ti-presentation"></i> 下載簡報（PPTX）
+            </button>
+            <button onclick="copyForGamma()" style="padding:10px 18px;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;border:none;border-radius:8px;font-size:14px;cursor:pointer;display:flex;align-items:center;gap:6px">
+              <i class="ti ti-copy"></i> 複製大綱給 Gamma
+            </button>
+          </div>
+          <div id="gamma-hint" style="display:none;margin-top:10px;background:#1e1b4b;border:1px solid #6366f1;border-radius:8px;padding:12px 14px;font-size:13px;color:#c7d2fe;line-height:1.8">
+            <div style="font-weight:bold;margin-bottom:6px;color:#a5b4fc">✅ 大綱已複製！接下來：</div>
+            <div>1. 開啟 Gamma.app　2. 點「貼上文字」　3. Ctrl+V 貼上 → Generate</div>
+            <a href="https://gamma.app" target="_blank" style="display:inline-block;margin-top:8px;padding:7px 16px;background:#6366f1;color:#fff;border-radius:6px;text-decoration:none;font-size:13px">
+              <i class="ti ti-external-link"></i> 開啟 Gamma.app
+            </a>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -610,6 +587,11 @@ let _lastSpokenText='';  // 記住最後一句話，供「重複」指令使用
 let _completedToday=[];  // 本次開啟後完成的待辦，供晚間簡報使用
 let isTTSSpeaking=false; // TTS 播報期間為 true，防止辨識在段落空隙誤收自己的聲音
 let _chainTookOver=false; // speakChain 主動取消 speakFeedback 時設為 true，避免 onerror 干擾
+// ── 創意討論室 ──
+let _ideaChatHistory=[];  // 對話歷史 [{role:'user'|'assistant',content:'...'}]
+let _ideaExchangeCount=0; // 來回次數（user 說一次+1）
+let _ideaSlides=null;     // 整理後的結構化簡報資料
+let _ideaTheme='dark';    // 簡報風格：dark|light|vivid
 const STORAGE_KEY_TODOS='jyste_todos_v3', STORAGE_KEY_MEETINGS='jyste_meetings_v3', STORAGE_KEY_API='jyste_groq_key';
 const weekdays=['日','一','二','三','四','五','六'];
 
@@ -1989,34 +1971,30 @@ function executeVoiceCommand(cmd){
     speakFeedback('好的 已切換到歷史記錄');
   }
 
-  // ── 創意捕捉 ──────────────────────────────────────────────────
+  // ── 創意討論室 ──────────────────────────────────────────────────
   else if(['我有個想法','有個想法','我有個點子','有個點子','我有個創意','有個創意','記錄想法','記錄創意','新想法','新創意'].some(w=>cmd.includes(w))){
     switchTab('idea');
-    _ideaMode='capture';
-    // 從語音指令取得想法文字（去掉觸發詞）
     const triggers=['我有個想法','有個想法','我有個點子','有個點子','我有個創意','有個創意','記錄想法','記錄創意','新想法','新創意'];
     let ideaText=cmd;
     triggers.forEach(t=>{ideaText=ideaText.replace(t,'');});
     ideaText=ideaText.trim();
     if(ideaText){
-      document.getElementById('idea-input').value=ideaText;
-      speakFeedback('好的 我收到你的想法了 幫你整理一下');
-      setTimeout(startIdeaCapture,800);
+      document.getElementById('idea-chat-input').value=ideaText;
+      speakFeedback('好的 我聽到了 我們一起來討論');
+      setTimeout(()=>sendIdeaMessage(),600);
     }else{
-      speakFeedback('好的 請說出或輸入你的想法');
-      setIdeaStatus('請說出你的想法，說完後按「開始發展」','ti-microphone-2');
+      speakFeedback('好的 請說出或輸入你的想法 我們一起討論');
     }
   }
 
-  // ── 下載簡報 ──────────────────────────────────────────────────
+  // ── 整理想法 / 下載簡報 ──────────────────────────────────────
+  else if(['整理想法','整理成簡報','整理簡報','幫我整理'].some(w=>cmd.includes(w))){
+    if(_ideaExchangeCount>=1){ finalizeIdea(); speakFeedback('好的 幫你整理成簡報大綱'); }
+    else{ switchTab('idea'); speakFeedback('請先跟我說說你的想法 我們討論一下再整理'); }
+  }
   else if(['下載簡報','產出簡報','做成簡報','生成簡報','產生簡報'].some(w=>cmd.includes(w))){
-    if(_ideaMode==='done'){
-      downloadIdeaPPTX();
-      speakFeedback('好的 幫你下載簡報');
-    }else{
-      switchTab('idea');
-      speakFeedback('請先說出你的想法 整理完成後就可以下載簡報');
-    }
+    if(_ideaSlides){ downloadIdeaPPTX(); speakFeedback('好的 幫你下載簡報'); }
+    else{ switchTab('idea'); speakFeedback('請先跟我討論想法 整理完成後就可以下載簡報'); }
   }
 
   // ── 未知指令：有 API Key 就交給 AI 回答，否則給提示 ──────────
@@ -2035,6 +2013,340 @@ function executeVoiceCommand(cmd){
     }
   }
 }
+
+// ════════════════════════════════════════════════════════════
+//  創意討論室  v3.14
+// ════════════════════════════════════════════════════════════
+
+function addIdeaBubble(role, text){
+  const area = document.getElementById('idea-chat-area');
+  // 移除空狀態提示
+  const empty = area.querySelector('.idea-empty-state');
+  if(empty) empty.remove();
+
+  const wrap = document.createElement('div');
+  wrap.style.cssText = `display:flex;gap:8px;align-items:flex-end;${role==='user'?'flex-direction:row-reverse':''}`;
+
+  const avatar = document.createElement('div');
+  avatar.style.cssText = `width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;${role==='user'?'background:#3b82f6':'background:#f59e0b'}`;
+  avatar.textContent = role==='user' ? '我' : '刀';
+
+  const bubble = document.createElement('div');
+  bubble.style.cssText = `max-width:78%;padding:10px 14px;border-radius:${role==='user'?'14px 4px 14px 14px':'4px 14px 14px 14px'};font-size:14px;line-height:1.7;white-space:pre-wrap;${role==='user'?'background:#3b82f6;color:#fff':'background:var(--bg2);border:1px solid var(--border);color:var(--text)'}`;
+  bubble.textContent = text;
+
+  wrap.appendChild(avatar);
+  wrap.appendChild(bubble);
+  area.appendChild(wrap);
+  area.scrollTop = area.scrollHeight;
+  return bubble;
+}
+
+function showIdeaTyping(){
+  const area = document.getElementById('idea-chat-area');
+  const wrap = document.createElement('div');
+  wrap.id = 'idea-typing-indicator';
+  wrap.style.cssText = 'display:flex;gap:8px;align-items:flex-end';
+
+  const avatar = document.createElement('div');
+  avatar.style.cssText = 'width:30px;height:30px;border-radius:50%;background:#f59e0b;display:flex;align-items:center;justify-content:center;font-size:14px;color:#000;flex-shrink:0';
+  avatar.textContent = '刀';
+
+  const bubble = document.createElement('div');
+  bubble.style.cssText = 'padding:10px 16px;border-radius:4px 14px 14px 14px;background:var(--bg2);border:1px solid var(--border)';
+  bubble.innerHTML = '<span style="display:inline-flex;gap:4px"><span style="animation:blink 1s infinite 0s">●</span><span style="animation:blink 1s infinite .2s">●</span><span style="animation:blink 1s infinite .4s">●</span></span>';
+
+  wrap.appendChild(avatar);
+  wrap.appendChild(bubble);
+  area.appendChild(wrap);
+  area.scrollTop = area.scrollHeight;
+}
+
+function hideIdeaTyping(){
+  const el = document.getElementById('idea-typing-indicator');
+  if(el) el.remove();
+}
+
+function setIdeaStatus(text, icon){
+  const el = document.getElementById('idea-status-text');
+  if(el) el.textContent = text;
+  const ic = document.querySelector('#idea-status i');
+  if(ic && icon){ ic.className = 'ti '+icon; }
+}
+
+async function searchForIdea(query){
+  try{
+    const url = `https://corsproxy.io/?https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1&skip_disambig=1`;
+    const res = await fetch(url);
+    const data = await res.json();
+    let snippets = [];
+    if(data.AbstractText) snippets.push(data.AbstractText);
+    (data.RelatedTopics||[]).slice(0,3).forEach(t=>{
+      if(t.Text) snippets.push(t.Text);
+    });
+    return snippets.slice(0,3).join(' ').slice(0,400) || '';
+  }catch(e){ return ''; }
+}
+
+async function sendIdeaMessage(){
+  const input = document.getElementById('idea-chat-input');
+  const userText = (input.value||'').trim();
+  if(!userText) return;
+  input.value = '';
+
+  // 顯示用戶泡泡
+  addIdeaBubble('user', userText);
+  _ideaChatHistory.push({role:'user', content:userText});
+  _ideaExchangeCount++;
+
+  // 2輪後顯示整理按鈕
+  if(_ideaExchangeCount >= 2){
+    document.getElementById('idea-finalize-area').style.display = 'block';
+  }
+
+  // 上網搜尋相關資料
+  showIdeaTyping();
+  let webSnippet = '';
+  // 第一輪或關鍵字明顯時才搜尋，避免每次都等待
+  if(_ideaExchangeCount <= 2){
+    webSnippet = await searchForIdea(userText.slice(0, 60));
+  }
+
+  // 組建系統提示
+  const systemPrompt = `你是鈞曜科技 AI 秘書刀疤，現在扮演創意顧問角色。
+用繁體中文，以輕鬆對話方式：
+1. 先肯定對方的想法，給出1~2點具體看法或潛在價值
+2. 如果有網路資料，自然帶入相關背景（不要說「根據搜尋」，直接融入對話）
+3. 提出1個最關鍵的問題，幫助把想法說得更具體
+每次回覆控制在120字以內，口語化，不要用條列符號。`;
+
+  const messages = [{role:'system', content:systemPrompt}];
+  if(webSnippet) messages.push({role:'system', content:`補充資料（自然融入，不要直接引用）：${webSnippet}`});
+  messages.push(..._ideaChatHistory.slice(-8)); // 保留最近8輪
+
+  try{
+    const reply = await callGemini(messages);
+    hideIdeaTyping();
+    const cleanReply = reply.replace(/[*#\[\]]/g,'').trim();
+    addIdeaBubble('assistant', cleanReply);
+    _ideaChatHistory.push({role:'assistant', content:cleanReply});
+    setIdeaStatus(`已討論 ${_ideaExchangeCount} 輪，可繼續討論或按「整理成簡報大綱」`, 'ti-messages');
+    // 語音朗讀（節縮版，避免太長）
+    if(isAwake && voiceCtrlActive){
+      const short = cleanReply.slice(0,80);
+      speakFeedback(short);
+    }
+  }catch(e){
+    hideIdeaTyping();
+    addIdeaBubble('assistant','抱歉，我剛才想太多了，可以再說一次嗎？');
+  }
+}
+
+async function finalizeIdea(){
+  if(_ideaChatHistory.length < 2){ showToast('⚠️ 請先和刀疤討論一下你的想法'); return; }
+
+  const btn = document.getElementById('idea-finalize-btn-wrap');
+  if(btn) btn.innerHTML = '<div style="text-align:center;padding:10px;color:var(--text2)"><i class="ti ti-loader-2 spin"></i> 整理中...</div>';
+
+  const conversationText = _ideaChatHistory
+    .map(m=>(m.role==='user'?'【想法提出人】':'【刀疤顧問】')+m.content)
+    .join('\n');
+
+  const prompt = `以下是創意討論對話，請根據討論內容整理出簡報結構，用 JSON 格式輸出：
+{
+  "title": "簡報標題",
+  "subtitle": "副標題或一句話摘要",
+  "slides": [
+    {"title": "章節名稱", "points": ["重點1","重點2","重點3"]},
+    ...（3~5個章節）
+  ]
+}
+只輸出 JSON，不要其他說明。討論內容：\n${conversationText}`;
+
+  try{
+    const raw = await callGemini(prompt);
+    const jsonMatch = raw.match(/\{[\s\S]*\}/);
+    if(!jsonMatch) throw new Error('no json');
+    _ideaSlides = JSON.parse(jsonMatch[0]);
+
+    // 顯示結果區
+    document.getElementById('idea-ready-section').style.display = 'block';
+    if(btn) btn.style.display = 'none';
+    setIdeaStatus('✅ 大綱整理完成！選擇風格後下載簡報', 'ti-check');
+
+    // 顯示摘要泡泡
+    const summary = (_ideaSlides.slides||[]).map((s,i)=>`${i+1}. ${s.title}`).join('\n');
+    addIdeaBubble('assistant', `好的！我幫你整理成以下架構：\n${summary}\n\n可以選擇風格下載 PPTX，或複製大綱到 Gamma.app 製作更精美的版本！`);
+
+    if(isAwake && voiceCtrlActive) speakFeedback('大綱整理完成 請選擇簡報風格再下載');
+  }catch(e){
+    if(btn) btn.innerHTML = '<button onclick="finalizeIdea()" style="width:100%;padding:11px;background:linear-gradient(135deg,#f59e0b,#d97706);color:#000;border:none;border-radius:8px;font-size:14px;font-weight:bold;cursor:pointer"><i class="ti ti-sparkles"></i> 整理成簡報大綱</button>';
+    showToast('❌ 整理失敗，請再試一次');
+  }
+}
+
+function clearIdea(){
+  _ideaChatHistory = [];
+  _ideaExchangeCount = 0;
+  _ideaSlides = null;
+  const area = document.getElementById('idea-chat-area');
+  area.innerHTML = `<div class="idea-empty-state" style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:var(--text2);font-size:13px;gap:10px">
+    <i class="ti ti-bulb" style="font-size:32px;color:#f59e0b"></i>
+    <div style="text-align:center;line-height:1.8">輸入你的想法，刀疤會：<br>① 給你看法和意見　② 上網查相關資料　③ 問關鍵問題</div>
+  </div>`;
+  document.getElementById('idea-chat-input').value = '';
+  document.getElementById('idea-finalize-area').style.display = 'none';
+  document.getElementById('idea-ready-section').style.display = 'none';
+  document.getElementById('gamma-hint').style.display = 'none';
+  const btnWrap = document.getElementById('idea-finalize-btn-wrap');
+  if(btnWrap){ btnWrap.style.display='block'; btnWrap.innerHTML='<button onclick="finalizeIdea()" style="width:100%;padding:11px;background:linear-gradient(135deg,#f59e0b,#d97706);color:#000;border:none;border-radius:8px;font-size:14px;font-weight:bold;cursor:pointer"><i class="ti ti-sparkles"></i> 整理成簡報大綱</button>'; }
+  setIdeaStatus('說出你的想法，刀疤會提出看法和問題，一起把想法變具體','ti-bulb');
+}
+
+function setIdeaTheme(theme){
+  _ideaTheme = theme;
+  ['dark','light','vivid'].forEach(t=>{
+    const btn = document.getElementById('theme-btn-'+t);
+    if(!btn) return;
+    btn.style.opacity = (t===theme)?'1':'0.55';
+    btn.style.transform = (t===theme)?'scale(1.05)':'scale(1)';
+  });
+  showToast('✅ 已選擇' + (theme==='dark'?'專業深色':theme==='light'?'現代簡潔':'活潑鮮豔') + '風格');
+}
+
+function copyForGamma(){
+  if(!_ideaSlides||!_ideaSlides.slides){showToast('⚠️ 請先整理想法');return;}
+  const d=_ideaSlides;
+  let md='';
+  md+=`# ${d.title||'創意提案'}\n`;
+  md+=`${d.subtitle||'鈞曜科技有限公司'}\n\n`;
+  md+=`## 議程\n`;
+  d.slides.forEach(s=>{md+=`- ${s.title||''}\n`;});
+  md+='\n';
+  d.slides.forEach(s=>{
+    md+=`## ${s.title||''}\n`;
+    (s.points||[]).forEach(p=>{md+=`- ${p}\n`;});
+    md+='\n';
+  });
+  md+=`## 重點摘要\n`;
+  d.slides.forEach(s=>{
+    const first=(s.points||[])[0]||'';
+    if(first)md+=`- **${s.title}**：${first}\n`;
+  });
+  md+='\n## 謝謝聆聽\n鈞曜科技有限公司';
+  navigator.clipboard.writeText(md)
+    .then(()=>{ document.getElementById('gamma-hint').style.display='block'; showToast('✅ 大綱已複製！請前往 Gamma.app 貼上'); })
+    .catch(()=>{
+      const ta=document.createElement('textarea');
+      ta.value=md; document.body.appendChild(ta); ta.select();
+      document.execCommand('copy'); document.body.removeChild(ta);
+      document.getElementById('gamma-hint').style.display='block';
+      showToast('✅ 大綱已複製！請前往 Gamma.app 貼上');
+    });
+}
+
+// ── downloadIdeaPPTX ─────────────────────────────────────────
+async function downloadIdeaPPTX(){
+  if(!window.PptxGenJS){showToast('⚠️ 簡報套件載入中，請稍後再試');return;}
+  const data=_ideaSlides;
+  if(!data||!data.slides||data.slides.length===0){showToast('⚠️ 沒有可用的簡報資料');return;}
+  const THEMES={
+    dark:{cover:'1C2B5E',bar:'1C2B5E',content:'FFFFFF',alt:'EEF2FF',end:'1C2B5E',
+          accent:'4B7BF5',accentL:'C7D7FE',white:'FFFFFF',dark:'1F2937',gray:'6B7280',
+          bullet:'1C2B5E',sidebar:'4B7BF5',summBox:'EEF2FF',summLine:'4B7BF5'},
+    light:{cover:'2563EB',bar:'2563EB',content:'FFFFFF',alt:'F0F7FF',end:'1E3A8A',
+           accent:'2563EB',accentL:'BFDBFE',white:'FFFFFF',dark:'1F2937',gray:'6B7280',
+           bullet:'2563EB',sidebar:'2563EB',summBox:'F0F7FF',summLine:'2563EB'},
+    vivid:{cover:'7C3AED',bar:'7C3AED',content:'FFFFFF',alt:'F5F3FF',end:'6D28D9',
+           accent:'F59E0B',accentL:'FDE68A',white:'FFFFFF',dark:'1F2937',gray:'6B7280',
+           bullet:'7C3AED',sidebar:'F59E0B',summBox:'FFF7ED',summLine:'F59E0B'}
+  };
+  const t=THEMES[_ideaTheme]||THEMES.dark;
+  const JH='Microsoft JhengHei';
+  showToast('⏳ 正在產生高品質簡報...');
+  try{
+    const pptx=new window.PptxGenJS();
+    pptx.layout='LAYOUT_16x9';
+    pptx.title=data.title||'鈞曜創意提案';
+    const now=new Date();
+    const dateStr=`${now.getFullYear()}年${now.getMonth()+1}月${now.getDate()}日`;
+
+    // 封面
+    const cover=pptx.addSlide();
+    cover.background={color:t.cover};
+    cover.addShape(pptx.ShapeType.rect,{x:0,y:0,w:10,h:0.1,fill:{color:t.accent},line:{color:t.accent}});
+    cover.addShape(pptx.ShapeType.rect,{x:0,y:4.2,w:10,h:1.425,fill:{color:'00000033'},line:{color:'00000033'}});
+    cover.addText('鈞曜科技有限公司',{x:0.6,y:0.25,w:9,h:0.45,fontSize:13,color:t.accentL,align:'left',fontFace:JH});
+    cover.addText(data.title||'創意提案',{x:0.6,y:1.0,w:8.8,h:2.2,fontSize:44,bold:true,color:t.white,align:'left',wrap:true,fontFace:JH});
+    cover.addText(data.subtitle||'',{x:0.6,y:3.3,w:8.8,h:0.75,fontSize:19,color:t.accentL,align:'left',fontFace:JH});
+    cover.addText(dateStr,{x:0.6,y:4.5,w:5,h:0.4,fontSize:12,color:t.gray,fontFace:JH});
+    cover.addShape(pptx.ShapeType.rect,{x:0,y:0.1,w:0.06,h:4.1,fill:{color:t.accentL},line:{color:t.accentL}});
+
+    // 議程
+    const agenda=pptx.addSlide();
+    agenda.background={color:t.content};
+    agenda.addShape(pptx.ShapeType.rect,{x:0,y:0,w:0.12,h:5.625,fill:{color:t.sidebar},line:{color:t.sidebar}});
+    agenda.addShape(pptx.ShapeType.rect,{x:0.12,y:0,w:9.88,h:1.1,fill:{color:t.alt},line:{color:t.alt}});
+    agenda.addText('議程',{x:0.4,y:0.15,w:3,h:0.8,fontSize:32,bold:true,color:t.dark,fontFace:JH});
+    agenda.addText('AGENDA',{x:3.5,y:0.25,w:3,h:0.65,fontSize:14,color:t.accent,fontFace:'Arial',italic:true});
+    data.slides.forEach((s,i)=>{
+      const yp=1.25+i*0.68;
+      agenda.addShape(pptx.ShapeType.ellipse,{x:0.35,y:yp+0.05,w:0.42,h:0.42,fill:{color:t.bullet},line:{color:t.bullet}});
+      agenda.addText(String(i+1),{x:0.35,y:yp+0.05,w:0.42,h:0.42,fontSize:13,bold:true,color:t.white,align:'center',valign:'middle',margin:0,fontFace:JH});
+      agenda.addText(s.title||'',{x:0.9,y:yp,w:8.7,h:0.55,fontSize:17,color:t.dark,valign:'middle',fontFace:JH});
+    });
+
+    // 內容頁
+    data.slides.forEach((s,idx)=>{
+      const slide=pptx.addSlide();
+      slide.background={color:idx%2===0?t.content:t.alt};
+      slide.addShape(pptx.ShapeType.rect,{x:0,y:0,w:10,h:1.05,fill:{color:t.bar},line:{color:t.bar}});
+      slide.addShape(pptx.ShapeType.ellipse,{x:9.1,y:0.18,w:0.6,h:0.6,fill:{color:t.accent},line:{color:t.accent}});
+      slide.addText(String(idx+1),{x:9.1,y:0.18,w:0.6,h:0.6,fontSize:12,bold:true,color:t.white,align:'center',valign:'middle',margin:0,fontFace:JH});
+      slide.addText(s.title||'',{x:0.4,y:0.05,w:8.5,h:0.95,fontSize:24,bold:true,color:t.white,valign:'middle',fontFace:JH});
+      (s.points||[]).slice(0,5).forEach((p,i)=>{
+        const yp=1.2+i*0.82;
+        slide.addShape(pptx.ShapeType.ellipse,{x:0.4,y:yp+0.1,w:0.38,h:0.38,fill:{color:t.bullet},line:{color:t.bullet}});
+        slide.addText(String(i+1),{x:0.4,y:yp+0.1,w:0.38,h:0.38,fontSize:12,bold:true,color:t.white,align:'center',valign:'middle',margin:0,fontFace:JH});
+        slide.addText(p,{x:0.95,y:yp,w:8.6,h:0.65,fontSize:15,color:t.dark,valign:'middle',wrap:true,fontFace:JH});
+      });
+    });
+
+    // 摘要
+    const sumSlide=pptx.addSlide();
+    sumSlide.background={color:t.alt};
+    sumSlide.addShape(pptx.ShapeType.rect,{x:0,y:0,w:10,h:1.05,fill:{color:t.bar},line:{color:t.bar}});
+    sumSlide.addText('重點摘要',{x:0.4,y:0.05,w:8,h:0.95,fontSize:24,bold:true,color:t.white,valign:'middle',fontFace:JH});
+    sumSlide.addText('KEY TAKEAWAYS',{x:5.5,y:0.22,w:4,h:0.65,fontSize:12,color:t.accentL,align:'right',italic:true,fontFace:'Arial'});
+    data.slides.slice(0,4).forEach((s,i)=>{
+      const col=i%2; const row=Math.floor(i/2);
+      const bx=0.4+col*4.9; const by=1.2+row*1.95;
+      sumSlide.addShape(pptx.ShapeType.rect,{x:bx,y:by,w:4.5,h:1.75,fill:{color:t.summBox},line:{color:t.summLine,pt:1.5}});
+      sumSlide.addShape(pptx.ShapeType.rect,{x:bx,y:by,w:4.5,h:0.45,fill:{color:t.bullet},line:{color:t.bullet}});
+      sumSlide.addText(s.title||'',{x:bx+0.1,y:by+0.02,w:4.3,h:0.41,fontSize:13,bold:true,color:t.white,valign:'middle',margin:2,fontFace:JH});
+      sumSlide.addText((s.points||[])[0]||'',{x:bx+0.1,y:by+0.5,w:4.3,h:1.1,fontSize:13,color:t.dark,valign:'top',wrap:true,margin:4,fontFace:JH});
+    });
+
+    // 結尾
+    const end=pptx.addSlide();
+    end.background={color:t.end};
+    end.addShape(pptx.ShapeType.rect,{x:0,y:0,w:10,h:0.1,fill:{color:t.accent},line:{color:t.accent}});
+    end.addShape(pptx.ShapeType.rect,{x:3.5,y:2.85,w:3,h:0.06,fill:{color:t.accentL},line:{color:t.accentL}});
+    end.addText('謝謝聆聽',{x:0.5,y:1.2,w:9,h:1.5,fontSize:52,bold:true,color:t.white,align:'center',fontFace:JH});
+    end.addText(data.title||'創意提案',{x:0.5,y:3.1,w:9,h:0.75,fontSize:18,color:t.accentL,align:'center',fontFace:JH});
+    end.addText('鈞曜科技有限公司　'+dateStr,{x:0.5,y:4.7,w:9,h:0.4,fontSize:12,color:t.gray,align:'center',fontFace:JH});
+
+    const fname=`鈞曜_${(data.title||'創意提案').slice(0,10)}_${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}.pptx`;
+    await pptx.writeFile({fileName:fname});
+    showToast('✅ 簡報已下載！');
+    if(isAwake&&voiceCtrlActive) speakFeedback('簡報已下載完成');
+  }catch(e){
+    showToast('⚠️ 簡報產生失敗：'+e.message);
+    console.error(e);
+  }
+}
+
+// ════════════════════════════════════════════════════════════
 
 function speakAfterDelay(text, delay){
   setTimeout(()=>{
@@ -2503,284 +2815,6 @@ function _speakEveningSimple(greeting,pending,overdue,dueTomorrow,dueDayAfter){
   parts.push(endings[Math.floor(Math.random()*endings.length)]);
 
   speakChain(parts.join(''));
-}
-
-// ── 創意捕捉工坊 ────────────────────────────────────────────
-let _ideaRaw='';        // 用戶原始想法
-let _ideaAnswer='';     // 補充回答
-let _ideaStructured=''; // 整理後的結構
-let _ideaSlides=null;   // 簡報資料（JSON）
-let _ideaMode=null;     // null|'capture'|'clarify'|'done'
-let _ideaTheme='dark';  // 簡報風格：dark|light|vivid
-
-function setIdeaStatus(text,icon='ti-microphone-2'){
-  document.getElementById('idea-status-text').textContent=text;
-  document.querySelector('#idea-status i').className='ti '+icon+' '+(icon==='ti-loader-2'?'spin':'');
-}
-
-async function startIdeaCapture(){
-  if(!apiKey){showToast('請先設定 Groq API Key');return;}
-  const raw=document.getElementById('idea-input').value.trim();
-  if(!raw){showToast('請先輸入或說出你的想法');return;}
-  _ideaRaw=raw;
-  _ideaMode='clarify';
-
-  // 顯示 loading
-  document.getElementById('idea-loading').style.display='block';
-  document.getElementById('idea-qa-area').style.display='none';
-  document.getElementById('idea-result-area').style.display='none';
-  setIdeaStatus('刀疤正在理解你的想法...','ti-loader-2');
-
-  try{
-    // 第一步：AI 生成一個關鍵釐清問題
-    const qRes=await callGemini(
-      `你是鈞曜科技總經理bruce哥的AI秘書「刀疤」。bruce哥有一個不完整的想法，請你用一句話問最關鍵的釐清問題，幫助把想法補全。`+
-      `只問一個問題，問句要具體，繁體中文，不超過40字。\n想法：${raw}`
-    );
-    const question=qRes.replace(/[【】*#\n]/g,' ').trim();
-    document.getElementById('idea-loading').style.display='none';
-    document.getElementById('idea-question').textContent=question;
-    document.getElementById('idea-qa-area').style.display='block';
-    document.getElementById('idea-answer').focus();
-    setIdeaStatus('請回答刀疤的問題，幫助補全想法','ti-help-circle');
-    // 語音播報問題
-    if(isAwake&&voiceCtrlActive) speakChain('我想多了解一下。'+question);
-  }catch(e){
-    document.getElementById('idea-loading').style.display='none';
-    // 跳過釐清，直接整理
-    await structureIdea();
-  }
-}
-
-async function submitIdeaAnswer(){
-  _ideaAnswer=document.getElementById('idea-answer').value.trim();
-  document.getElementById('idea-qa-area').style.display='none';
-  await structureIdea();
-}
-
-async function structureIdea(){
-  document.getElementById('idea-loading').style.display='block';
-  setIdeaStatus('刀疤正在整理你的想法，請稍等...','ti-loader-2');
-  try{
-    const prompt=
-      `你是鈞曜科技總經理bruce哥的AI秘書「刀疤」。請根據以下資料，整理出一份完整的想法結構，並同時輸出兩個部分：\n`+
-      `【A】純文字摘要（繁體中文，條列式，清楚呈現：①核心想法 ②目標對象 ③解決問題 ④執行方向 ⑤預期效益）\n`+
-      `【B】JSON格式簡報資料，格式如下：\n`+
-      `{"title":"簡報標題","subtitle":"副標題（一句話）","slides":[`+
-      `{"title":"投影片標題","points":["重點1","重點2","重點3"]},...]}\n`+
-      `投影片數量依內容複雜度自動決定（3~8張），JSON必須合法可解析。\n\n`+
-      `原始想法：${_ideaRaw}\n`+
-      (_ideaAnswer?`補充說明：${_ideaAnswer}\n`:'');
-
-    const res=await callGemini(prompt);
-
-    // 分離 A 和 B
-    const jsonMatch=res.match(/\{[\s\S]*"title"[\s\S]*"slides"[\s\S]*\}/);
-    if(jsonMatch){
-      try{_ideaSlides=JSON.parse(jsonMatch[0]);}catch(e){_ideaSlides=null;}
-    }
-    // 文字摘要（去掉JSON部分）
-    _ideaStructured=res.replace(/```json[\s\S]*?```/g,'').replace(/\{[\s\S]*"slides"[\s\S]*\}/,'').trim();
-
-    document.getElementById('idea-loading').style.display='none';
-    document.getElementById('idea-result-content').textContent=_ideaStructured;
-    document.getElementById('idea-result-area').style.display='block';
-    _ideaMode='done';
-    setIdeaStatus('想法整理完成！可以下載簡報或繼續補充','ti-check');
-    if(isAwake&&voiceCtrlActive) speakChain('好的 bruce哥 你的想法我已經整理好了，說下載簡報就可以產出投影片。');
-  }catch(e){
-    document.getElementById('idea-loading').style.display='none';
-    setIdeaStatus('整理失敗，請再試一次','ti-alert-circle');
-    showToast('⚠️ 整理失敗：'+e.message);
-  }
-}
-
-function refineIdea(){
-  // 把目前結果放回輸入框繼續補充
-  const combined=_ideaRaw+(_ideaAnswer?'\n補充：'+_ideaAnswer:'')+'\n\n已整理結果：\n'+_ideaStructured;
-  document.getElementById('idea-input').value=combined;
-  document.getElementById('idea-result-area').style.display='none';
-  document.getElementById('idea-qa-area').style.display='none';
-  _ideaMode=null;
-  setIdeaStatus('已匯入整理結果，可繼續補充後再發展','ti-edit');
-}
-
-function clearIdea(){
-  _ideaRaw=''; _ideaAnswer=''; _ideaStructured=''; _ideaSlides=null; _ideaMode=null;
-  document.getElementById('idea-input').value='';
-  document.getElementById('idea-qa-area').style.display='none';
-  document.getElementById('idea-result-area').style.display='none';
-  document.getElementById('idea-loading').style.display='none';
-  setIdeaStatus('說「我有個想法」或在下方輸入你的創意','ti-microphone-2');
-}
-
-function copyForGamma(){
-  if(!_ideaSlides||!_ideaSlides.slides){showToast('⚠️ 請先整理想法');return;}
-  const d=_ideaSlides;
-
-  // 組成 Gamma 最適合的 Markdown 大綱格式
-  let md='';
-  md+=`# ${d.title||'創意提案'}\n`;
-  md+=`${d.subtitle||'鈞曜科技有限公司'}\n\n`;
-
-  // 議程總覽
-  md+=`## 議程\n`;
-  d.slides.forEach((s,i)=>{md+=`- ${s.title||''}\n`;});
-  md+='\n';
-
-  // 各章節內容
-  d.slides.forEach(s=>{
-    md+=`## ${s.title||''}\n`;
-    (s.points||[]).forEach(p=>{md+=`- ${p}\n`;});
-    md+='\n';
-  });
-
-  // 重點摘要
-  md+=`## 重點摘要\n`;
-  d.slides.forEach(s=>{
-    const first=(s.points||[])[0]||'';
-    if(first)md+=`- **${s.title}**：${first}\n`;
-  });
-  md+='\n';
-  md+=`## 謝謝聆聽\n鈞曜科技有限公司`;
-
-  navigator.clipboard.writeText(md).then(()=>{
-    document.getElementById('gamma-hint').style.display='block';
-    showToast('✅ 大綱已複製！請前往 Gamma.app 貼上');
-  }).catch(()=>{
-    // 備用：建立暫時 textarea 複製
-    const ta=document.createElement('textarea');
-    ta.value=md; document.body.appendChild(ta);
-    ta.select(); document.execCommand('copy');
-    document.body.removeChild(ta);
-    document.getElementById('gamma-hint').style.display='block';
-    showToast('✅ 大綱已複製！請前往 Gamma.app 貼上');
-  });
-}
-
-function setIdeaTheme(theme){
-  _ideaTheme=theme;
-  ['dark','light','vivid'].forEach(t=>{
-    const b=document.getElementById('theme-btn-'+t);
-    if(b)b.style.outline=t===theme?'3px solid #22c55e':'none';
-  });
-  showToast({dark:'🌑 已選擇：專業深色',light:'☀️ 已選擇：現代簡潔',vivid:'🎨 已選擇：活潑鮮豔'}[theme]);
-}
-
-async function downloadIdeaPPTX(){
-  if(!window.PptxGenJS){showToast('⚠️ 簡報套件載入中，請稍後再試');return;}
-  const data=_ideaSlides;
-  if(!data||!data.slides||data.slides.length===0){showToast('⚠️ 沒有可用的簡報資料');return;}
-
-  // ── 主題色彩表 ──
-  const THEMES={
-    dark:{cover:'1C2B5E',bar:'1C2B5E',content:'FFFFFF',alt:'EEF2FF',end:'1C2B5E',
-          accent:'4B7BF5',accentL:'C7D7FE',white:'FFFFFF',dark:'1F2937',gray:'6B7280',
-          bullet:'1C2B5E',sidebar:'4B7BF5',summBox:'EEF2FF',summLine:'4B7BF5'},
-    light:{cover:'2563EB',bar:'2563EB',content:'FFFFFF',alt:'F0F7FF',end:'1E3A8A',
-           accent:'2563EB',accentL:'BFDBFE',white:'FFFFFF',dark:'1F2937',gray:'6B7280',
-           bullet:'2563EB',sidebar:'2563EB',summBox:'F0F7FF',summLine:'2563EB'},
-    vivid:{cover:'7C3AED',bar:'7C3AED',content:'FFFFFF',alt:'F5F3FF',end:'6D28D9',
-           accent:'F59E0B',accentL:'FDE68A',white:'FFFFFF',dark:'1F2937',gray:'6B7280',
-           bullet:'7C3AED',sidebar:'F59E0B',summBox:'FFF7ED',summLine:'F59E0B'}
-  };
-  const t=THEMES[_ideaTheme]||THEMES.dark;
-  const JH='Microsoft JhengHei';
-
-  showToast('⏳ 正在產生高品質簡報...');
-  try{
-    const pptx=new window.PptxGenJS();
-    pptx.layout='LAYOUT_16x9';
-    pptx.title=data.title||'鈞曜創意提案';
-    const now=new Date();
-    const dateStr=`${now.getFullYear()}年${now.getMonth()+1}月${now.getDate()}日`;
-
-    // ══ 1. 封面 ══
-    const cover=pptx.addSlide();
-    cover.background={color:t.cover};
-    // 頂部細線
-    cover.addShape(pptx.ShapeType.rect,{x:0,y:0,w:10,h:0.1,fill:{color:t.accent},line:{color:t.accent}});
-    // 底部暗色區
-    cover.addShape(pptx.ShapeType.rect,{x:0,y:4.2,w:10,h:1.425,fill:{color:'00000033'},line:{color:'00000033'}});
-    // 公司名
-    cover.addText('鈞曜科技有限公司',{x:0.6,y:0.25,w:9,h:0.45,fontSize:13,color:t.accentL,align:'left',fontFace:JH});
-    // 主標題
-    cover.addText(data.title||'創意提案',{x:0.6,y:1.0,w:8.8,h:2.2,fontSize:44,bold:true,color:t.white,align:'left',wrap:true,fontFace:JH});
-    // 副標題
-    cover.addText(data.subtitle||'',{x:0.6,y:3.3,w:8.8,h:0.75,fontSize:19,color:t.accentL,align:'left',fontFace:JH});
-    // 日期
-    cover.addText(dateStr,{x:0.6,y:4.5,w:5,h:0.4,fontSize:12,color:t.gray,fontFace:JH});
-    // 左側裝飾線
-    cover.addShape(pptx.ShapeType.rect,{x:0,y:0.1,w:0.06,h:4.1,fill:{color:t.accentL},line:{color:t.accentL}});
-
-    // ══ 2. 議程 ══
-    const agenda=pptx.addSlide();
-    agenda.background={color:t.content};
-    agenda.addShape(pptx.ShapeType.rect,{x:0,y:0,w:0.12,h:5.625,fill:{color:t.sidebar},line:{color:t.sidebar}});
-    agenda.addShape(pptx.ShapeType.rect,{x:0.12,y:0,w:9.88,h:1.1,fill:{color:t.alt},line:{color:t.alt}});
-    agenda.addText('議程',{x:0.4,y:0.15,w:3,h:0.8,fontSize:32,bold:true,color:t.dark,fontFace:JH});
-    agenda.addText('AGENDA',{x:3.5,y:0.25,w:3,h:0.65,fontSize:14,color:t.accent,fontFace:'Arial',italic:true});
-    data.slides.forEach((s,i)=>{
-      const yp=1.25+i*0.68;
-      agenda.addShape(pptx.ShapeType.ellipse,{x:0.35,y:yp+0.05,w:0.42,h:0.42,fill:{color:t.bullet},line:{color:t.bullet}});
-      agenda.addText(String(i+1),{x:0.35,y:yp+0.05,w:0.42,h:0.42,fontSize:13,bold:true,color:t.white,align:'center',valign:'middle',margin:0,fontFace:JH});
-      agenda.addText(s.title||'',{x:0.9,y:yp,w:8.7,h:0.55,fontSize:17,color:t.dark,valign:'middle',fontFace:JH});
-    });
-
-    // ══ 3. 內容投影片 ══
-    data.slides.forEach((s,idx)=>{
-      const slide=pptx.addSlide();
-      slide.background={color:idx%2===0?t.content:t.alt};
-      // 頂部標題條
-      slide.addShape(pptx.ShapeType.rect,{x:0,y:0,w:10,h:1.05,fill:{color:t.bar},line:{color:t.bar}});
-      // 頁碼圓形
-      slide.addShape(pptx.ShapeType.ellipse,{x:9.1,y:0.18,w:0.6,h:0.6,fill:{color:t.accent},line:{color:t.accent}});
-      slide.addText(String(idx+1),{x:9.1,y:0.18,w:0.6,h:0.6,fontSize:12,bold:true,color:t.white,align:'center',valign:'middle',margin:0,fontFace:JH});
-      // 標題文字
-      slide.addText(s.title||'',{x:0.4,y:0.05,w:8.5,h:0.95,fontSize:24,bold:true,color:t.white,valign:'middle',fontFace:JH});
-      // 內容重點（編號圓圈+文字）
-      const pts=(s.points||[]).slice(0,5);
-      pts.forEach((p,i)=>{
-        const yp=1.2+i*0.82;
-        slide.addShape(pptx.ShapeType.ellipse,{x:0.4,y:yp+0.1,w:0.38,h:0.38,fill:{color:t.bullet},line:{color:t.bullet}});
-        slide.addText(String(i+1),{x:0.4,y:yp+0.1,w:0.38,h:0.38,fontSize:12,bold:true,color:t.white,align:'center',valign:'middle',margin:0,fontFace:JH});
-        slide.addText(p,{x:0.95,y:yp,w:8.6,h:0.65,fontSize:15,color:t.dark,valign:'middle',wrap:true,fontFace:JH});
-      });
-    });
-
-    // ══ 4. 摘要 ══
-    const sumSlide=pptx.addSlide();
-    sumSlide.background={color:t.alt};
-    sumSlide.addShape(pptx.ShapeType.rect,{x:0,y:0,w:10,h:1.05,fill:{color:t.bar},line:{color:t.bar}});
-    sumSlide.addText('重點摘要',{x:0.4,y:0.05,w:8,h:0.95,fontSize:24,bold:true,color:t.white,valign:'middle',fontFace:JH});
-    sumSlide.addText('KEY TAKEAWAYS',{x:5.5,y:0.22,w:4,h:0.65,fontSize:12,color:t.accentL,align:'right',italic:true,fontFace:'Arial'});
-    const sumItems=data.slides.slice(0,4);
-    sumItems.forEach((s,i)=>{
-      const col=i%2; const row=Math.floor(i/2);
-      const bx=0.4+col*4.9; const by=1.2+row*1.95;
-      sumSlide.addShape(pptx.ShapeType.rect,{x:bx,y:by,w:4.5,h:1.75,fill:{color:t.summBox},line:{color:t.summLine,pt:1.5}});
-      sumSlide.addShape(pptx.ShapeType.rect,{x:bx,y:by,w:4.5,h:0.45,fill:{color:t.bullet},line:{color:t.bullet}});
-      sumSlide.addText(s.title||'',{x:bx+0.1,y:by+0.02,w:4.3,h:0.41,fontSize:13,bold:true,color:t.white,valign:'middle',margin:2,fontFace:JH});
-      sumSlide.addText((s.points||[])[0]||'',{x:bx+0.1,y:by+0.5,w:4.3,h:1.1,fontSize:13,color:t.dark,valign:'top',wrap:true,margin:4,fontFace:JH});
-    });
-
-    // ══ 5. 結尾 ══
-    const end=pptx.addSlide();
-    end.background={color:t.end};
-    end.addShape(pptx.ShapeType.rect,{x:0,y:0,w:10,h:0.1,fill:{color:t.accent},line:{color:t.accent}});
-    end.addShape(pptx.ShapeType.rect,{x:3.5,y:2.85,w:3,h:0.06,fill:{color:t.accentL},line:{color:t.accentL}});
-    end.addText('謝謝聆聽',{x:0.5,y:1.2,w:9,h:1.5,fontSize:52,bold:true,color:t.white,align:'center',fontFace:JH});
-    end.addText(data.title||'創意提案',{x:0.5,y:3.1,w:9,h:0.75,fontSize:18,color:t.accentL,align:'center',fontFace:JH});
-    end.addText('鈞曜科技有限公司　'+dateStr,{x:0.5,y:4.7,w:9,h:0.4,fontSize:12,color:t.gray,align:'center',fontFace:JH});
-
-    const fname=`鈞曜_${(data.title||'創意提案').slice(0,10)}_${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}.pptx`;
-    await pptx.writeFile({fileName:fname});
-    showToast('✅ 簡報已下載！');
-    if(isAwake&&voiceCtrlActive) speakFeedback('簡報已下載完成');
-  }catch(e){
-    showToast('⚠️ 簡報產生失敗：'+e.message);
-    console.error(e);
-  }
 }
 
 // ── ④ 智慧對話 ────────────────────────────────────
