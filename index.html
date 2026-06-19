@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>鈞曜科技 AI 秘書 v3.12</title>
+<title>鈞曜科技 AI 秘書 v3.13</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
 <style>
@@ -502,9 +502,24 @@ input:focus { outline: none; border-color: var(--info) !important; }
           <button onclick="downloadIdeaPPTX()" style="padding:10px 20px;background:#22c55e;color:#fff;border:none;border-radius:8px;font-size:14px;cursor:pointer;display:flex;align-items:center;gap:6px">
             <i class="ti ti-presentation"></i> 下載簡報（PPTX）
           </button>
+          <button onclick="copyForGamma()" style="padding:10px 20px;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;border:none;border-radius:8px;font-size:14px;cursor:pointer;display:flex;align-items:center;gap:6px">
+            <i class="ti ti-copy"></i> 複製大綱給 Gamma
+          </button>
           <button onclick="refineIdea()" style="padding:10px 20px;background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:8px;font-size:14px;cursor:pointer">
             <i class="ti ti-refresh"></i> 繼續補充
           </button>
+        </div>
+        <!-- Gamma 操作說明（複製後顯示） -->
+        <div id="gamma-hint" style="display:none;margin-top:12px;background:#1e1b4b;border:1px solid #6366f1;border-radius:8px;padding:12px 14px;font-size:13px;color:#c7d2fe;line-height:1.8">
+          <div style="font-weight:bold;margin-bottom:6px;color:#a5b4fc">✅ 大綱已複製！接下來：</div>
+          <div>1. 點下方按鈕開啟 Gamma.app</div>
+          <div>2. 點「New」→「Paste in text」</div>
+          <div>3. 貼上（Ctrl+V）→ 選主題風格 → 按「Generate」</div>
+          <div>4. 幾秒後就是一份專業簡報 🎉</div>
+          <a href="https://gamma.app" target="_blank"
+            style="display:inline-block;margin-top:10px;padding:8px 18px;background:#6366f1;color:#fff;border-radius:6px;text-decoration:none;font-size:13px">
+            <i class="ti ti-external-link"></i> 開啟 Gamma.app
+          </a>
         </div>
       </div>
 
@@ -2597,6 +2612,50 @@ function clearIdea(){
   document.getElementById('idea-result-area').style.display='none';
   document.getElementById('idea-loading').style.display='none';
   setIdeaStatus('說「我有個想法」或在下方輸入你的創意','ti-microphone-2');
+}
+
+function copyForGamma(){
+  if(!_ideaSlides||!_ideaSlides.slides){showToast('⚠️ 請先整理想法');return;}
+  const d=_ideaSlides;
+
+  // 組成 Gamma 最適合的 Markdown 大綱格式
+  let md='';
+  md+=`# ${d.title||'創意提案'}\n`;
+  md+=`${d.subtitle||'鈞曜科技有限公司'}\n\n`;
+
+  // 議程總覽
+  md+=`## 議程\n`;
+  d.slides.forEach((s,i)=>{md+=`- ${s.title||''}\n`;});
+  md+='\n';
+
+  // 各章節內容
+  d.slides.forEach(s=>{
+    md+=`## ${s.title||''}\n`;
+    (s.points||[]).forEach(p=>{md+=`- ${p}\n`;});
+    md+='\n';
+  });
+
+  // 重點摘要
+  md+=`## 重點摘要\n`;
+  d.slides.forEach(s=>{
+    const first=(s.points||[])[0]||'';
+    if(first)md+=`- **${s.title}**：${first}\n`;
+  });
+  md+='\n';
+  md+=`## 謝謝聆聽\n鈞曜科技有限公司`;
+
+  navigator.clipboard.writeText(md).then(()=>{
+    document.getElementById('gamma-hint').style.display='block';
+    showToast('✅ 大綱已複製！請前往 Gamma.app 貼上');
+  }).catch(()=>{
+    // 備用：建立暫時 textarea 複製
+    const ta=document.createElement('textarea');
+    ta.value=md; document.body.appendChild(ta);
+    ta.select(); document.execCommand('copy');
+    document.body.removeChild(ta);
+    document.getElementById('gamma-hint').style.display='block';
+    showToast('✅ 大綱已複製！請前往 Gamma.app 貼上');
+  });
 }
 
 function setIdeaTheme(theme){
