@@ -1144,12 +1144,14 @@ function importTodos(){
 
 // ── Groq API ──────────────────────────────────────
 async function callGemini(prompt){
+  // 支援傳入字串（單輪）或 messages array（多輪對話）
+  const msgs=Array.isArray(prompt)?prompt:[{role:'user',content:prompt}];
   const res=await fetch('https://api.groq.com/openai/v1/chat/completions',{
     method:'POST',
     headers:{'Content-Type':'application/json','Authorization':'Bearer '+apiKey},
     body:JSON.stringify({
       model:'llama-3.3-70b-versatile',
-      messages:[{role:'user',content:prompt}],
+      messages:msgs,
       max_tokens:2000
     })
   });
