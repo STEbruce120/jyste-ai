@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>鈞曜科技 AI 秘書 v3.32</title>
+<title>鈞曜科技 AI 秘書 v3.33</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
 <style>
@@ -1753,7 +1753,7 @@ function speakChain(text){
     if(_speakChainGen !== myGen){ clearInterval(_speakChainKeepAlive); _speakChainKeepAlive=null; return; }
     window.speechSynthesis.pause();
     window.speechSynthesis.resume();
-  }, 10000);
+  }, 5000);
 
   function next(){
     if(_speakChainGen !== myGen) return;
@@ -1773,11 +1773,15 @@ function speakChain(text){
     window.speechSynthesis.speak(u);
   }
 
-  if(window.speechSynthesis.getVoices().length===0){
-    window.speechSynthesis.onvoiceschanged = ()=>{ window.speechSynthesis.onvoiceschanged=null; next(); };
-  } else {
-    next();
-  }
+  // 讓出一個 event loop，讓 Chrome 完成 cancel() 後再開始新的語音
+  setTimeout(()=>{
+    if(_speakChainGen !== myGen) return;
+    if(window.speechSynthesis.getVoices().length===0){
+      window.speechSynthesis.onvoiceschanged = ()=>{ window.speechSynthesis.onvoiceschanged=null; next(); };
+    } else {
+      next();
+    }
+  }, 0);
 }
 
 
