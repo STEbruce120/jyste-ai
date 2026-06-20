@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>鈞曜科技 AI 秘書 v3.40</title>
+<title>鈞曜科技 AI 秘書 v3.41</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
 <style>
@@ -2048,6 +2048,35 @@ function executeVoiceCommand(cmd){
   if(_processingGuard)clearTimeout(_processingGuard);
   _processingGuard=setTimeout(resetProcessingState,12000); // 一般指令12秒安全護衛
 
+  // ── 待辦新增：等待用戶說出事項內容 ──────────────────────────
+  if(voicePendingAdd){
+    voicePendingAdd=false;
+    if(_processingGuard){clearTimeout(_processingGuard);_processingGuard=null;}
+    voiceAddTodo(cmd);
+    return;
+  }
+
+  // ── 待辦新增：等待用戶說「確認」或「取消」─────────────────────
+  if(voicePendingConfirm){
+    if(['確認','對','沒錯','是的','好','OK','ok'].some(w=>cmd.includes(w))){
+      if(_processingGuard){clearTimeout(_processingGuard);_processingGuard=null;}
+      const {text,date}=voicePendingConfirm;
+      clearVoicePending();
+      switchTab('todo');
+      const newTodo={id:Date.now(),text,date:date||null,done:false,createdAt:new Date().toISOString()};
+      todos.push(newTodo);
+      sbInsert('todos',newTodo).catch(()=>{});
+      renderTodos();
+      speakFeedback('好的 已新增 '+text+(date?' 日期'+dateToSpeech(date):''));
+      return;
+    } else if(['取消','算了','不要','不用了','不對'].some(w=>cmd.includes(w))){
+      if(_processingGuard){clearTimeout(_processingGuard);_processingGuard=null;}
+      clearVoicePending();
+      speakFeedback('好的 已取消');
+      return;
+    }
+  }
+
   // ── 創意討論室等待模式：下一句直接送進討論室 ──────────────────
   if(_ideaListening){
     _ideaListening=false;
@@ -2246,7 +2275,7 @@ function executeVoiceCommand(cmd){
   }
 
   // ── 晚間收尾簡報 ──────────────────────────────────────────────
-  else if(['今天怎麼樣','今天如何','今天結束','下班了','下班','收工','晚安','晚間簡報','今天狀況','今天回顧','工作回顧','今天總結'].some(w=>cmd.includes(w))){
+  else if(['今天怎麼樣','今天如何','今天結束','下班了','下班','收工','晚安','晚間簡報','今天回顧','工作回顧','今天總結'].some(w=>cmd.includes(w))){
     if(_processingGuard){clearTimeout(_processingGuard);_processingGuard=null;}
     _processingGuard=setTimeout(resetProcessingState,25000);
     speakEveningBriefing();
@@ -2284,6 +2313,14 @@ function executeVoiceCommand(cmd){
   else if(['下載簡報','產出簡報','做成簡報','生成簡報','產生簡報'].some(w=>cmd.includes(w))){
     if(_ideaSlides){ downloadIdeaPPTX(); speakFeedback('好的 幫你下載簡報'); }
     else{ switchTab('idea'); speakFeedback('請先跟我討論想法 整理完成後就可以下載簡報'); }
+  }
+
+  // ── 再見 / 結束對話 ───────────────────────────────────────────
+  else if(['再見','掰掰','拜拜','結束對話','掰了','bye'].some(w=>cmd.includes(w))){
+    if(_processingGuard){clearTimeout(_processingGuard);_processingGuard=null;}
+    const goodbyes=['好的 有需要再叫我 再見 bruce哥','掰掰 bruce哥 有事找我','好 我先待命 需要的時候叫我'];
+    speakFeedback(goodbyes[Math.floor(Math.random()*goodbyes.length)]);
+    setTimeout(()=>setAwakeMode(false),1500);
   }
 
   // ── 未知指令：有 API Key 就交給 AI 回答，否則給提示 ──────────
