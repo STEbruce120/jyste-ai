@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>鈞曜科技 AI 秘書 v3.16</title>
+<title>鈞曜科技 AI 秘書 v3.17</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
 <style>
@@ -2107,6 +2107,11 @@ async function sendIdeaMessage(){
   const userText = (input.value||'').trim();
   if(!userText) return;
   input.value = '';
+
+  // ★ 立刻停麥克風，避免 AI 回覆的 TTS 被自己收音
+  if(voiceCtrlRecognition && voiceCtrlActive){
+    try{ voiceCtrlRecognition.stop(); }catch(e){}
+  }
 
   // 顯示用戶泡泡
   addIdeaBubble('user', userText);
