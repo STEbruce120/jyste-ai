@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>鈞曜科技 AI 秘書 v3.31</title>
+<title>鈞曜科技 AI 秘書 v3.32</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
 <style>
@@ -1773,15 +1773,11 @@ function speakChain(text){
     window.speechSynthesis.speak(u);
   }
 
-  // Chrome cancel 後需短暫等待才能開始新的語音，避免延遲或吃掉第一個字
-  setTimeout(()=>{
-    if(_speakChainGen !== myGen) return;
-    if(window.speechSynthesis.getVoices().length===0){
-      window.speechSynthesis.onvoiceschanged = ()=>{ window.speechSynthesis.onvoiceschanged=null; next(); };
-    } else {
-      next();
-    }
-  }, 150);
+  if(window.speechSynthesis.getVoices().length===0){
+    window.speechSynthesis.onvoiceschanged = ()=>{ window.speechSynthesis.onvoiceschanged=null; next(); };
+  } else {
+    next();
+  }
 }
 
 
