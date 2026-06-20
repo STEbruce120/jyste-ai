@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>鈞曜科技 AI 秘書 v3.15</title>
+<title>鈞曜科技 AI 秘書 v3.16</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
 <style>
@@ -2423,10 +2423,12 @@ function speakFeedback(text){
     if(isAwake&&voiceCtrlActive){
       document.getElementById('voice-ctrl-status').textContent='刀疤已喚醒 請說指令 說「再見」結束對話';
       if(sleepTimeout)clearTimeout(sleepTimeout);
+      // 討論模式給更多思考時間（120秒），平時30秒
+      const delay=(_ideaExchangeCount>0||_ideaListening)?120000:30000;
       sleepTimeout=setTimeout(()=>{
         setAwakeMode(false);
         speakFeedback('我先休息一下 需要的時候叫我');
-      },30000);
+      },delay);
     }
     if(voiceCtrlActive&&voiceCtrlRecognition){
       setTimeout(()=>{try{voiceCtrlRecognition.start();}catch(e){}},400);
@@ -2515,10 +2517,12 @@ function _voiceChainDone(){
   if(isAwake&&voiceCtrlActive){
     document.getElementById('voice-ctrl-status').textContent='刀疤已喚醒 請說指令 說「再見」結束對話';
     if(sleepTimeout)clearTimeout(sleepTimeout);
+    // 討論模式給更多思考時間（120秒），平時30秒
+    const delay=(_ideaExchangeCount>0||_ideaListening)?120000:30000;
     sleepTimeout=setTimeout(()=>{
       setAwakeMode(false);
       speakFeedback('我先休息一下 需要的時候叫我');
-    },30000);
+    },delay);
   }
   if(voiceCtrlActive&&voiceCtrlRecognition){
     setTimeout(()=>{try{voiceCtrlRecognition.start();}catch(e){}},400);
