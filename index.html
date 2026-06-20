@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>鈞曜科技 AI 秘書 v3.22</title>
+<title>鈞曜科技 AI 秘書 v3.23</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
 <style>
@@ -2517,12 +2517,27 @@ function speakChain(text){
   }
   if(chunks.length===0){_voiceChainDone();return;}
 
+  // 每5秒提醒系統繼續朗讀，防止中途自動停住
+  const keepAlive=setInterval(()=>{
+    if(window.speechSynthesis.paused){
+      window.speechSynthesis.resume();
+    }
+  },5000);
+
   let idx=0;
   function next(){
     if(sleepTimeout){clearTimeout(sleepTimeout);sleepTimeout=null;}
-    if(idx>=chunks.length){_voiceChainDone();return;}
+    if(idx>=chunks.length){
+      clearInterval(keepAlive);
+      _voiceChainDone();
+      return;
+    }
     // 若語音控制已關閉或離開喚醒狀態，停止朗讀
-    if(voiceCtrlActive&&!isAwake){_voiceChainDone();return;}
+    if(voiceCtrlActive&&!isAwake){
+      clearInterval(keepAlive);
+      _voiceChainDone();
+      return;
+    }
     const u=new SpeechSynthesisUtterance(chunks[idx]);
     u.lang='zh-TW';u.rate=1.15;u.pitch=1.05;
     const vv=window.speechSynthesis.getVoices();
