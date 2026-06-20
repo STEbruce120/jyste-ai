@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>鈞曜科技 AI 秘書 v3.38</title>
+<title>鈞曜科技 AI 秘書 v3.39</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
 <style>
@@ -598,7 +598,10 @@ function setupRecognitionHandlers(){
 
   voiceCtrlRecognition.onend=()=>{
     if(!voiceCtrlActive) return;
-    // 不管是否在朗讀，辨識停掉就重啟，指令攔截交給 isTTSSpeaking 旗標
+    if(isTTSSpeaking){
+      // TTS 播放中，先不搶音訊資源，等 _voiceChainDone 或 startSpeak.onend 負責重啟
+      return;
+    }
     setTimeout(()=>{ try{voiceCtrlRecognition.start();}catch(err){} },300);
   };
 }
@@ -1732,7 +1735,9 @@ function speakChain(text){
   if(sleepTimeout){ clearTimeout(sleepTimeout); sleepTimeout=null; }
   // 遞增 feedbackGen，讓進行中的 speakFeedback.onend 失效，由我們接管
   _feedbackGen++;
-  window.speechSynthesis.cancel();
+  // 只有真的有東西在播才 cancel()，避免不必要的 cancel 讓 Chrome TTS 引擎重置
+  const _wasPlaying = window.speechSynthesis.speaking || window.speechSynthesis.pending;
+  if(_wasPlaying) window.speechSynthesis.cancel();
 
   // 依句點/驚嘆號/問號切句
   const chunks = text.split(/(?<=[。！？!?\n])/g).map(s=>s.trim()).filter(s=>s.length>0);
@@ -1772,7 +1777,7 @@ function speakChain(text){
     window.speechSynthesis.speak(u);
   }
 
-  // 給 Chrome 50ms 處理 cancel() 後再開始新的語音
+  // 只有 cancel 過才等 50ms，否則直接開始
   setTimeout(()=>{
     if(_speakChainGen !== myGen) return;
     if(window.speechSynthesis.getVoices().length===0){
@@ -1780,7 +1785,7 @@ function speakChain(text){
     } else {
       next();
     }
-  }, 50);
+  }, _wasPlaying ? 50 : 0);
 }
 
 
