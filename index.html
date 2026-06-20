@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>鈞曜科技 AI 秘書 v3.39</title>
+<title>鈞曜科技 AI 秘書 v3.40</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
 <style>
@@ -1557,6 +1557,65 @@ function buildDailyBriefing(){
   text+=endings[Math.floor(Math.random()*endings.length)];
 
   return text;
+}
+
+function speakEveningBriefing(){
+  const now=new Date();
+  const weekdays=['日','一','二','三','四','五','六'];
+  const month=now.getMonth()+1;
+  const day=now.getDate();
+  const weekday=weekdays[now.getDay()];
+
+  const openers=[
+    `bruce哥辛苦了 今天${month}月${day}號星期${weekday} 來幫你做個收尾`,
+    `收工了 bruce哥 ${month}月${day}號星期${weekday} 幫你整理一下今天的狀況`,
+    `bruce哥今天辛苦了 來看看${month}月${day}號的成果`
+  ];
+  let text=openers[Math.floor(Math.random()*openers.length)];
+
+  // 今日完成事項
+  if(_completedToday.length>0){
+    text+=` 今天完成了${_completedToday.length}件事`;
+    if(_completedToday.length<=3){
+      text+=` 包括${_completedToday.map(t=>t.text).join('、')}`;
+    }
+    text+=' 很不錯';
+  }else{
+    text+=' 今天沒有從這裡完成待辦事項';
+  }
+
+  // 剩餘未完成
+  const pending=todos.filter(t=>!t.done);
+  const overdue=pending.filter(t=>{ if(!t.date)return false; return daysUntil(t.date)<0; });
+  const urgent=pending.filter(t=>{ if(!t.date)return false; const d=daysUntil(t.date); return d!==null&&d>=0&&d<=3; });
+
+  if(overdue.length>0){
+    text+=` 另外提醒你 有${overdue.length}件事已經過了截止日期`;
+    if(overdue.length<=2) text+=` 是${overdue.map(t=>t.text).join('和')}`;
+    text+=' 明天記得優先處理';
+  }else if(urgent.length>0){
+    text+=` 還有${urgent.length}件事快到期了`;
+    urgent.slice(0,2).forEach(t=>{
+      const d=daysUntil(t.date);
+      const when=d===0?'今天到期':d===1?'明天到期':'還有'+d+'天';
+      text+=` ${t.text}${when}`;
+    });
+    text+=' 記得安排時間';
+  }else if(pending.length>0){
+    text+=` 還有${pending.length}件待辦 明天繼續加油`;
+  }else{
+    text+=' 今天的事情全部清完了 難得清閒 好好休息';
+  }
+
+  const endings=[
+    ' 好好休息 明天見',
+    ' 今天辛苦了 早點休息',
+    ' 明天見 bruce哥 好好休息',
+    ' 有需要明天再找我 先好好休息'
+  ];
+  text+=endings[Math.floor(Math.random()*endings.length)];
+
+  speakChain(text);
 }
 
 function autoSpeakIfFirstVisitToday(){
