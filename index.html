@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>鈞曜科技 AI 秘書 v3.30</title>
+<title>鈞曜科技 AI 秘書 v3.31</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
 <style>
@@ -1584,6 +1584,8 @@ async function startSpeak(){
   document.getElementById('speak-btn').style.background='#ef4444';
   document.getElementById('speak-btn').innerHTML='<i class="ti ti-player-pause"></i> 播報中';
 
+  // 清除休眠計時器，避免朗讀中途被強制休眠
+  if(sleepTimeout){ clearTimeout(sleepTimeout); sleepTimeout=null; }
   window.speechSynthesis.cancel();
 
   const ttsText=preprocessTTS(text);
@@ -1669,13 +1671,11 @@ function speakFeedback(text){
     if(_speakChainTookOver){ _speakChainTookOver=false; return; }
     isTTSSpeaking = false;
     if(_processingGuard) clearTimeout(_processingGuard);
-    _processingGuard = setTimeout(()=>{
-      isProcessing = false;
-      _processingGuard = null;
-      if(isAwake && voiceCtrlActive && voiceCtrlRecognition){
-        try{ voiceCtrlRecognition.start(); }catch(e){}
-      }
-    }, 600);
+    _processingGuard = null;
+    isProcessing = false;
+    if(isAwake && voiceCtrlActive && voiceCtrlRecognition){
+      try{ voiceCtrlRecognition.start(); }catch(e){}
+    }
     if(!isAwake) return;
     if(sleepTimeout) clearTimeout(sleepTimeout);
     const delay = (_ideaExchangeCount>0||_ideaListening) ? 120000 : 30000;
@@ -1731,6 +1731,8 @@ function speakChain(text){
   if(voiceCtrlRecognition && voiceCtrlActive){
     try{ voiceCtrlRecognition.stop(); }catch(e){}
   }
+  // 清除休眠計時器，避免朗讀中途被強制休眠
+  if(sleepTimeout){ clearTimeout(sleepTimeout); sleepTimeout=null; }
   // 設旗標後再 cancel，讓 speakFeedback.onend 知道是被我們取消的
   _speakChainTookOver = true;
   window.speechSynthesis.cancel();
