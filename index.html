@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>鈞曜科技 AI 秘書 v3.19</title>
+<title>鈞曜科技 AI 秘書 v3.20</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
 <style>
@@ -1791,6 +1791,8 @@ function executeVoiceCommand(cmd){
   // ── 創意討論室等待模式：下一句直接送進討論室 ──────────────────
   if(_ideaListening){
     _ideaListening=false;
+    // 清除12秒護衛計時器，交給 speakChain/_voiceChainDone 管理狀態
+    if(_processingGuard){clearTimeout(_processingGuard);_processingGuard=null;}
     switchTab('idea');
     const input=document.getElementById('idea-chat-input');
     if(input){ input.value=cmd; sendIdeaMessage(); }
@@ -1801,6 +1803,8 @@ function executeVoiceCommand(cmd){
   const _ideaExitCmds=['再見','掰掰','結束','整理想法','整理成簡報','整理簡報','幫我整理',
                         '下載簡報','產出簡報','做成簡報','收工','休息','暫停'];
   if(_ideaExchangeCount > 0 && !_ideaExitCmds.some(w=>cmd.includes(w))){
+    // 清除12秒護衛計時器，交給 speakChain/_voiceChainDone 管理狀態
+    if(_processingGuard){clearTimeout(_processingGuard);_processingGuard=null;}
     const input=document.getElementById('idea-chat-input');
     if(input){ input.value=cmd; sendIdeaMessage(); }
     return;
