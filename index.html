@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>鈞曜科技 AI 秘書 v3.21</title>
+<title>鈞曜科技 AI 秘書 v3.22</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
 <style>
@@ -593,6 +593,7 @@ let _ideaExchangeCount=0; // 來回次數（user 說一次+1）
 let _ideaSlides=null;     // 整理後的結構化簡報資料
 let _ideaTheme='dark';    // 簡報風格：dark|light|vivid
 let _ideaListening=false; // true = 下一句語音直接送進討論室
+let _ideaSending=false;   // true = sendIdeaMessage 處理中，防止重複呼叫
 const STORAGE_KEY_TODOS='jyste_todos_v3', STORAGE_KEY_MEETINGS='jyste_meetings_v3', STORAGE_KEY_API='jyste_groq_key';
 const weekdays=['日','一','二','三','四','五','六'];
 
@@ -2122,8 +2123,8 @@ async function sendIdeaMessage(){
   input.value = '';
 
   // ★ 防止重複呼叫（Chrome 補發辨識事件會造成第二次進入）
-  if(isProcessing) return;
-  isProcessing = true;
+  if(_ideaSending) return;
+  _ideaSending = true;
 
   // ★ 立刻停麥克風，避免 AI 回覆的 TTS 被自己收音
   if(voiceCtrlRecognition && voiceCtrlActive){
@@ -2169,14 +2170,15 @@ async function sendIdeaMessage(){
     setIdeaStatus(`已討論 ${_ideaExchangeCount} 輪，可繼續討論或按「整理成簡報大綱」`, 'ti-messages');
     // 語音朗讀：用 speakChain 確保麥克風在朗讀前關閉、說完再重啟
     if(isAwake && voiceCtrlActive){
-      speakChain(cleanReply); // _voiceChainDone 會在播完後清除 isProcessing
-    }else{
-      isProcessing=false; // 不朗讀時自行清除
+      speakChain(cleanReply); // _voiceChainDone 會在播完後重啟麥克風
     }
+    // speakChain 播完或不朗讀時，都要解除 _ideaSending
+    // _voiceChainDone 已有 isProcessing=false，_ideaSending 在此清除
+    _ideaSending = false;
   }catch(e){
     hideIdeaTyping();
     addIdeaBubble('assistant','抱歉，我剛才想太多了，可以再說一次嗎？');
-    isProcessing=false; // 錯誤時也要清除，否則系統永久卡住
+    _ideaSending = false; // 錯誤時也要清除，否則系統永久卡住
   }
 }
 
