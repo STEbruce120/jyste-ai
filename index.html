@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>鈞曜科技 AI 秘書 v3.27</title>
+<title>鈞曜科技 AI 秘書 v3.29</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
 <style>
@@ -647,6 +647,8 @@ let _lastSpokenText='';  // 記住最後一句話，供「重複」指令使用
 let _completedToday=[];  // 本次開啟後完成的待辦，供晚間簡報使用
 let isTTSSpeaking=false; // TTS 播報期間為 true，防止辨識在段落空隙誤收自己的聲音
 let _chainTookOver=false; // speakChain 主動取消 speakFeedback 時設為 true，避免 onerror 干擾
+let _speakChainKeepAlive=null; // speakChain 的保活計時器（全域，避免舊的殘留）
+let _speakChainGen=0;           // 每次 speakChain 呼叫遞增，舊的 next() 自動失效
 // ── 創意討論室 ──
 let _ideaChatHistory=[];  // 對話歷史 [{role:'user'|'assistant',content:'...'}]
 let _ideaExchangeCount=0; // 來回次數（user 說一次+1）
@@ -1663,7 +1665,16 @@ function speakFeedback(text){
   if(tw) u.voice = tw;
   u.onend = ()=>{
     isTTSSpeaking = false;
-    isProcessing = false;
+    // 不立刻解除執行狀態，用 4 秒安全計時器自動重置
+    // 若後續有 speakChain，speakChain 會清除此計時器並接管
+    if(_processingGuard) clearTimeout(_processingGuard);
+    _processingGuard = setTimeout(()=>{
+      isProcessing = false;
+      _processingGuard = null;
+      if(isAwake && voiceCtrlActive && voiceCtrlRecognition){
+        try{ voiceCtrlRecognition.start(); }catch(e){}
+      }
+    }, 600);
     if(!isAwake) return;
     if(sleepTimeout) clearTimeout(sleepTimeout);
     const delay = (_ideaExchangeCount>0||_ideaListening) ? 120000 : 30000;
@@ -1671,11 +1682,12 @@ function speakFeedback(text){
       setAwakeMode(false);
       speakFeedback('我先休息一下 需要的時候叫我');
     }, delay);
-    if(voiceCtrlActive && voiceCtrlRecognition){
-      try{ voiceCtrlRecognition.start(); }catch(e){}
-    }
   };
-  u.onerror = u.onend;
+  u.onerror = (e)=>{
+    // 被 speakChain cancel 時不做清理，由 speakChain 接管
+    if(e.error==='canceled'||e.error==='interrupted') return;
+    u.onend();
+  };
   isTTSSpeaking = true;
   if(voiceCtrlRecognition && voiceCtrlActive){
     try{ voiceCtrlRecognition.stop(); }catch(e){}
@@ -1705,6 +1717,16 @@ function _voiceChainDone(){
 function speakChain(text){
   if(!text) return;
   _lastSpokenText = text;
+
+  // 清除舊的保活計時器（避免上一次殘留的定時器干擾新的朗讀）
+  if(_speakChainKeepAlive){ clearInterval(_speakChainKeepAlive); _speakChainKeepAlive=null; }
+  // 清除 speakFeedback 設的安全計時器
+  if(_processingGuard){ clearTimeout(_processingGuard); _processingGuard=null; }
+
+  // 遞增世代編號，舊的 next() 回呼自動失效
+  _speakChainGen++;
+  const myGen = _speakChainGen;
+
   isTTSSpeaking = true;
   if(voiceCtrlRecognition && voiceCtrlActive){
     try{ voiceCtrlRecognition.stop(); }catch(e){}
@@ -1723,14 +1745,17 @@ function speakChain(text){
 
   let idx = 0;
   // 每10秒主動 pause→resume，防止 Chrome 朗讀中途凍住
-  const keepAlive = setInterval(()=>{
+  _speakChainKeepAlive = setInterval(()=>{
+    if(_speakChainGen !== myGen){ clearInterval(_speakChainKeepAlive); _speakChainKeepAlive=null; return; }
     window.speechSynthesis.pause();
     window.speechSynthesis.resume();
   }, 10000);
 
   function next(){
+    // 如果已被新的 speakChain 取代，直接放棄
+    if(_speakChainGen !== myGen) return;
     if(idx >= chunks.length || !isAwake){
-      clearInterval(keepAlive);
+      if(_speakChainKeepAlive){ clearInterval(_speakChainKeepAlive); _speakChainKeepAlive=null; }
       _voiceChainDone();
       return;
     }
@@ -1740,8 +1765,8 @@ function speakChain(text){
     u.pitch = 1.05;
     const tw = getVoice();
     if(tw) u.voice = tw;
-    u.onend = ()=>{ idx++; next(); };
-    u.onerror = ()=>{ idx++; next(); };
+    u.onend = ()=>{ if(_speakChainGen!==myGen)return; idx++; next(); };
+    u.onerror = (e)=>{ if(_speakChainGen!==myGen)return; if(e.error==='canceled'||e.error==='interrupted')return; idx++; next(); };
     window.speechSynthesis.speak(u);
   }
 
