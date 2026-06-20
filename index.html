@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>鈞曜科技 AI 秘書 v3.41</title>
+<title>鈞曜科技 AI 秘書 v3.43</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
 <style>
@@ -1736,7 +1736,8 @@ function speakFeedback(text){
     if(_processingGuard) clearTimeout(_processingGuard);
     _processingGuard = null;
     isProcessing = false;
-    if(isAwake && voiceCtrlActive && voiceCtrlRecognition){
+    // 不論是否休息中，只要語音控制開著就重啟麥克風（讓休息狀態也能聽到「刀疤」喚醒詞）
+    if(voiceCtrlActive && voiceCtrlRecognition){
       try{ voiceCtrlRecognition.start(); }catch(e){}
     }
     if(!isAwake) return;
@@ -2063,10 +2064,10 @@ function executeVoiceCommand(cmd){
       const {text,date}=voicePendingConfirm;
       clearVoicePending();
       switchTab('todo');
-      const newTodo={id:Date.now(),text,date:date||null,done:false,createdAt:new Date().toISOString()};
+      const newTodo={id:Date.now(),text,person:'',date:date||'',time:'',done:false};
       todos.push(newTodo);
       sbInsert('todos',newTodo).catch(()=>{});
-      renderTodos();
+      saveData();renderTodos();updateMorningStats();checkReminders();
       speakFeedback('好的 已新增 '+text+(date?' 日期'+dateToSpeech(date):''));
       return;
     } else if(['取消','算了','不要','不用了','不對'].some(w=>cmd.includes(w))){
@@ -2318,9 +2319,30 @@ function executeVoiceCommand(cmd){
   // ── 再見 / 結束對話 ───────────────────────────────────────────
   else if(['再見','掰掰','拜拜','結束對話','掰了','bye'].some(w=>cmd.includes(w))){
     if(_processingGuard){clearTimeout(_processingGuard);_processingGuard=null;}
+    if(sleepTimeout){clearTimeout(sleepTimeout);sleepTimeout=null;}
+    // 先說再見（isAwake 還是 true），說完後由 speakFeedback.onend 重啟麥克風
+    // 這裡加入特殊再見文字讓休眠後的 speakFeedback 也能播放
     const goodbyes=['好的 有需要再叫我 再見 bruce哥','掰掰 bruce哥 有事找我','好 我先待命 需要的時候叫我'];
-    speakFeedback(goodbyes[Math.floor(Math.random()*goodbyes.length)]);
-    setTimeout(()=>setAwakeMode(false),1500);
+    const msg=goodbyes[Math.floor(Math.random()*goodbyes.length)];
+    setAwakeMode(false); // 先切換狀態
+    _feedbackGen++;
+    const myGen=_feedbackGen;
+    isTTSSpeaking=true;
+    const u=new SpeechSynthesisUtterance(preprocessTTS(msg));
+    u.lang='zh-TW';
+    u.rate=parseFloat(document.getElementById('voice-speed').value)||1.3;
+    u.pitch=1.05;
+    const tw=window.speechSynthesis.getVoices().find(v=>v.lang==='zh-TW')||null;
+    if(tw)u.voice=tw;
+    u.onend=()=>{
+      if(_feedbackGen!==myGen)return;
+      isTTSSpeaking=false;
+      isProcessing=false;
+      if(voiceCtrlActive&&voiceCtrlRecognition){try{voiceCtrlRecognition.start();}catch(e){}}
+    };
+    u.onerror=(e)=>{if(e.error==='canceled'||e.error==='interrupted')return; u.onend();};
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(u);
   }
 
   // ── 未知指令：有 API Key 就交給 AI 回答，否則給提示 ──────────
