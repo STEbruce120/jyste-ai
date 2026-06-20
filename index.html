@@ -1589,6 +1589,109 @@ function stopSpeak(){
   document.getElementById('speak-btn').innerHTML='<i class="ti ti-player-play"></i> 播報';
 }
 
+// ── speakFeedback：短句單次 TTS ─────────────────────────────
+function speakFeedback(text){
+  if(!isAwake && text !== '我先休息一下 需要的時候叫我') return;
+  _lastSpokenText = text;
+  window.speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(preprocessTTS(text));
+  u.lang = 'zh-TW';
+  u.rate = parseFloat(document.getElementById('voice-speed').value)||1.3;
+  u.pitch = 1.05;
+  const voices = window.speechSynthesis.getVoices();
+  const tw = voices.find(v=>v.lang==='zh-TW')||voices.find(v=>v.lang.startsWith('zh'))||null;
+  if(tw) u.voice = tw;
+  u.onend = ()=>{
+    isTTSSpeaking = false;
+    if(!isAwake) return;
+    if(sleepTimeout) clearTimeout(sleepTimeout);
+    const delay = (_ideaExchangeCount>0||_ideaListening) ? 120000 : 30000;
+    sleepTimeout = setTimeout(()=>{
+      setAwakeMode(false);
+      speakFeedback('我先休息一下 需要的時候叫我');
+    }, delay);
+    if(voiceCtrlActive && voiceCtrlRecognition){
+      try{ voiceCtrlRecognition.start(); }catch(e){}
+    }
+  };
+  u.onerror = u.onend;
+  isTTSSpeaking = true;
+  if(voiceCtrlRecognition && voiceCtrlActive){
+    try{ voiceCtrlRecognition.stop(); }catch(e){}
+  }
+  window.speechSynthesis.speak(u);
+}
+
+// ── _voiceChainDone：speakChain 播完後的清理 ─────────────────
+function _voiceChainDone(){
+  isTTSSpeaking = false;
+  isProcessing = false;
+  _ideaSending = false;
+  if(!isAwake) return;
+  document.getElementById('voice-ctrl-status').textContent='刀疤已喚醒 請說指令 說「再見」結束對話';
+  if(sleepTimeout) clearTimeout(sleepTimeout);
+  const delay = (_ideaExchangeCount>0||_ideaListening) ? 120000 : 30000;
+  sleepTimeout = setTimeout(()=>{
+    setAwakeMode(false);
+    speakFeedback('我先休息一下 需要的時候叫我');
+  }, delay);
+  if(voiceCtrlActive && voiceCtrlRecognition){
+    setTimeout(()=>{ try{ voiceCtrlRecognition.start(); }catch(e){}}, 400);
+  }
+}
+
+// ── speakChain：分句朗讀，避免 Chrome 15 秒截斷 ─────────────
+function speakChain(text){
+  if(!text) return;
+  _lastSpokenText = text;
+  isTTSSpeaking = true;
+  if(voiceCtrlRecognition && voiceCtrlActive){
+    try{ voiceCtrlRecognition.stop(); }catch(e){}
+  }
+  window.speechSynthesis.cancel();
+
+  // 依句點/驚嘆號/問號切句
+  const chunks = text.split(/(?<=[。！？!?\n])/g).map(s=>s.trim()).filter(s=>s.length>0);
+  if(chunks.length===0){ _voiceChainDone(); return; }
+
+  const speed = parseFloat(document.getElementById('voice-speed').value)||1.3;
+  function getVoice(){
+    const v = window.speechSynthesis.getVoices();
+    return v.find(x=>x.lang==='zh-TW')||v.find(x=>x.lang.startsWith('zh'))||null;
+  }
+
+  let idx = 0;
+  // 每10秒主動 pause→resume，防止 Chrome 朗讀中途凍住
+  const keepAlive = setInterval(()=>{
+    window.speechSynthesis.pause();
+    window.speechSynthesis.resume();
+  }, 10000);
+
+  function next(){
+    if(idx >= chunks.length || !isAwake){
+      clearInterval(keepAlive);
+      _voiceChainDone();
+      return;
+    }
+    const u = new SpeechSynthesisUtterance(preprocessTTS(chunks[idx]));
+    u.lang = 'zh-TW';
+    u.rate = speed;
+    u.pitch = 1.05;
+    const tw = getVoice();
+    if(tw) u.voice = tw;
+    u.onend = ()=>{ idx++; next(); };
+    u.onerror = ()=>{ idx++; next(); };
+    window.speechSynthesis.speak(u);
+  }
+
+  if(window.speechSynthesis.getVoices().length===0){
+    window.speechSynthesis.onvoiceschanged = ()=>{ window.speechSynthesis.onvoiceschanged=null; next(); };
+  } else {
+    next();
+  }
+}
+
+
 // ── 語音控制（持續對話版）──────────────────────────
 let voiceCtrlActive=false;
 let voiceCtrlRecognition=null;
