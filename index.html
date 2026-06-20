@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>鈞曜科技 AI 秘書 v3.17</title>
+<title>鈞曜科技 AI 秘書 v3.18</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
 <style>
@@ -1792,6 +1792,15 @@ function executeVoiceCommand(cmd){
   if(_ideaListening){
     _ideaListening=false;
     switchTab('idea');
+    const input=document.getElementById('idea-chat-input');
+    if(input){ input.value=cmd; sendIdeaMessage(); }
+    return;
+  }
+
+  // ── 創意討論進行中：除特定指令外，所有語音都繼續送進討論室 ────
+  const _ideaExitCmds=['再見','掰掰','結束','整理想法','整理成簡報','整理簡報','幫我整理',
+                        '下載簡報','產出簡報','做成簡報','收工','休息','暫停'];
+  if(_ideaExchangeCount > 0 && !_ideaExitCmds.some(w=>cmd.includes(w))){
     const input=document.getElementById('idea-chat-input');
     if(input){ input.value=cmd; sendIdeaMessage(); }
     return;
