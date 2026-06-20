@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>鈞曜科技 AI 秘書 v3.36</title>
+<title>鈞曜科技 AI 秘書 v3.37</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
 <style>
@@ -1690,9 +1690,7 @@ function speakFeedback(text){
     u.onend();
   };
   isTTSSpeaking = true;
-  if(voiceCtrlRecognition && voiceCtrlActive){
-    try{ voiceCtrlRecognition.stop(); }catch(e){}
-  }
+  // 麥克風保持開啟，由 isTTSSpeaking 旗標擋住指令，不停麥克風
   window.speechSynthesis.speak(u);
 }
 
@@ -1729,9 +1727,7 @@ function speakChain(text){
   const myGen = _speakChainGen;
 
   isTTSSpeaking = true;
-  if(voiceCtrlRecognition && voiceCtrlActive){
-    try{ voiceCtrlRecognition.stop(); }catch(e){}
-  }
+  // 麥克風保持開啟，由 isTTSSpeaking 旗標擋住指令，不停麥克風
   // 清除休眠計時器，避免朗讀中途被強制休眠
   if(sleepTimeout){ clearTimeout(sleepTimeout); sleepTimeout=null; }
   // 遞增 feedbackGen，讓進行中的 speakFeedback.onend 失效，由我們接管
