@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>鈞曜科技 AI 秘書 v3.18</title>
+<title>鈞曜科技 AI 秘書 v3.19</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
 <style>
@@ -2159,10 +2159,9 @@ async function sendIdeaMessage(){
     addIdeaBubble('assistant', cleanReply);
     _ideaChatHistory.push({role:'assistant', content:cleanReply});
     setIdeaStatus(`已討論 ${_ideaExchangeCount} 輪，可繼續討論或按「整理成簡報大綱」`, 'ti-messages');
-    // 語音朗讀（節縮版，避免太長）
+    // 語音朗讀：用 speakChain 確保麥克風在朗讀前關閉、說完再重啟
     if(isAwake && voiceCtrlActive){
-      const short = cleanReply.slice(0,80);
-      speakFeedback(short);
+      speakChain(cleanReply);
     }
   }catch(e){
     hideIdeaTyping();
