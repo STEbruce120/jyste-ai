@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>鈞曜科技 AI 秘書 v3.35</title>
+<title>鈞曜科技 AI 秘書 v3.36</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
 <style>
@@ -2061,8 +2061,10 @@ function executeVoiceCommand(cmd){
     const city=cities.find(c=>cmd.includes(c))||document.getElementById('weather-city').value.trim()||'';
     const day=cmd.includes('明天')?1:0;
     switchTab('morning');
-    speakFeedback(city?`好的 查詢${city}天氣 請稍等`:'好的 查詢天氣 請稍等');
-    setTimeout(()=>loadWeather(city,day,true),300);
+    // 不用語音確認，直接查詢，避免與 speakChain 競速造成延遲或中途停頓
+    document.getElementById('voice-ctrl-status').textContent = city ? `查詢${city}天氣中...` : '查詢天氣中...';
+    if(_processingGuard){clearTimeout(_processingGuard);_processingGuard=null;}
+    loadWeather(city,day,true);
   }
 
   // ── 指定第X條分析（支援：條/則/個，中文數字/阿拉伯數字1-8，多種說法）─
