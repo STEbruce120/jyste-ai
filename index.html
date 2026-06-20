@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>鈞曜科技 AI 秘書 v3.14</title>
+<title>鈞曜科技 AI 秘書 v3.15</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
 <style>
@@ -592,6 +592,7 @@ let _ideaChatHistory=[];  // 對話歷史 [{role:'user'|'assistant',content:'...
 let _ideaExchangeCount=0; // 來回次數（user 說一次+1）
 let _ideaSlides=null;     // 整理後的結構化簡報資料
 let _ideaTheme='dark';    // 簡報風格：dark|light|vivid
+let _ideaListening=false; // true = 下一句語音直接送進討論室
 const STORAGE_KEY_TODOS='jyste_todos_v3', STORAGE_KEY_MEETINGS='jyste_meetings_v3', STORAGE_KEY_API='jyste_groq_key';
 const weekdays=['日','一','二','三','四','五','六'];
 
@@ -1787,6 +1788,15 @@ function executeVoiceCommand(cmd){
   if(_processingGuard)clearTimeout(_processingGuard);
   _processingGuard=setTimeout(resetProcessingState,12000); // 一般指令12秒安全護衛
 
+  // ── 創意討論室等待模式：下一句直接送進討論室 ──────────────────
+  if(_ideaListening){
+    _ideaListening=false;
+    switchTab('idea');
+    const input=document.getElementById('idea-chat-input');
+    if(input){ input.value=cmd; sendIdeaMessage(); }
+    return;
+  }
+
   // ── 友善互動：打招呼 / 感謝 ──────────────────────────────────
   if(['謝謝','謝了','感謝','辛苦了','多謝','謝你'].some(w=>cmd.includes(w))){
     const r=['不客氣 bruce哥 有需要隨時說','這是我應該做的 有事盡管交給我','bruce哥太客氣了 我在這'];
@@ -1985,7 +1995,9 @@ function executeVoiceCommand(cmd){
       speakFeedback('好的 我聽到了 我們一起來討論');
       setTimeout(()=>sendIdeaMessage(),600);
     }else{
-      speakFeedback('好的 請說出或輸入你的想法 我們一起討論');
+      _ideaListening=true; // 下一句語音直接送進討論室
+      setIdeaStatus('請說出你的想法，刀疤在聽...','ti-microphone-2');
+      speakFeedback('好的 請說出你的想法 我在聽');
     }
   }
 
