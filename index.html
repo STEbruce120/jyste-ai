@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>鈞曜科技 AI 秘書 v3.44</title>
+<title>鈞曜科技 AI 秘書 v3.45</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
 <style>
@@ -566,12 +566,29 @@ function preprocessTTS(text){
 
 function setupRecognitionHandlers(){
   voiceCtrlRecognition.onresult=(e)=>{
-    if(voiceCooldown||isTTSSpeaking) return;
+    if(voiceCooldown) return;
     const result=e.results[e.results.length-1];
     if(!result.isFinal) return;
     const cmd=result[0].transcript.trim();
     if(!cmd) return;
     document.getElementById('voice-ctrl-result').textContent='聽到：'+cmd;
+
+    // 等待確認/取消時，即使 TTS 播放中也允許中斷並立即執行
+    if(voicePendingConfirm){
+      const confirmWords=['確認','對','沒錯','是的','好','OK','ok','取消','算了','不要','不用了','不對'];
+      if(confirmWords.some(w=>cmd.includes(w))){
+        if(isTTSSpeaking){
+          window.speechSynthesis.cancel();
+          isTTSSpeaking=false;
+          _feedbackGen++; // 讓舊的 speakFeedback onend 失效
+        }
+        isProcessing=true;
+        executeVoiceCommand(cmd);
+        return;
+      }
+    }
+
+    if(isTTSSpeaking) return;
 
     if(!isAwake){
       if(cmd.includes('刀疤')||cmd.includes('到吧')||cmd.includes('倒吧')){
@@ -2078,7 +2095,8 @@ function executeVoiceCommand(cmd){
     if(['確認','對','沒錯','是的','好','OK','ok'].some(w=>cmd.includes(w))){
       if(_processingGuard){clearTimeout(_processingGuard);_processingGuard=null;}
       const {text,date}=voicePendingConfirm;
-      clearVoicePending();
+      voicePendingConfirm=null; // 直接清除，不設冷卻期，避免擋住後續指令
+      voicePendingAdd=false;
       switchTab('todo');
       const newTodo={id:Date.now(),text,person:'',date:date||'',time:'',done:false};
       todos.push(newTodo);
