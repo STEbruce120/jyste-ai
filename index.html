@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>鈞曜科技 AI 秘書 v3.46</title>
+<title>鈞曜科技 AI 秘書 v3.47</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
 <style>
@@ -2082,6 +2082,8 @@ function executeVoiceCommand(cmd){
   document.getElementById('voice-ctrl-status').textContent='執行中：'+cmd;
   if(_processingGuard)clearTimeout(_processingGuard);
   _processingGuard=setTimeout(resetProcessingState,12000); // 一般指令12秒安全護衛
+  // 清除休眠計時器，避免指令執行中途被強制進入休眠
+  if(sleepTimeout){clearTimeout(sleepTimeout);sleepTimeout=null;}
 
   // ── 待辦新增：等待用戶說出事項內容 ──────────────────────────
   if(voicePendingAdd){
