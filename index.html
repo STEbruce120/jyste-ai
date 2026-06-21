@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>鈞曜科技 AI 秘書 v3.64</title>
+<title>鈞曜科技 AI 秘書 v3.65</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
 <style>
@@ -211,7 +211,7 @@ input:focus { outline: none; border-color: var(--info) !important; }
     <div class="logo"><i class="ti ti-robot"></i></div>
     <div class="header-text">
       <h1>鈞曜科技 AI 秘書</h1>
-      <p>會議記錄 ・ 待辦追蹤 ・ 每日晨報 ・ Outlook &nbsp;<span style="font-size:11px;background:#22c55e22;color:#22c55e;border:1px solid #22c55e44;border-radius:20px;padding:1px 8px;vertical-align:middle">v3.64</span></p>
+      <p>會議記錄 ・ 待辦追蹤 ・ 每日晨報 ・ Outlook &nbsp;<span style="font-size:11px;background:#22c55e22;color:#22c55e;border:1px solid #22c55e44;border-radius:20px;padding:1px 8px;vertical-align:middle">v3.65</span></p>
     </div>
     <div class="header-right" style="display:flex;gap:8px;align-items:center">
       <div class="api-status ok" id="api-status"><i class="ti ti-check"></i> AI 已連線</div>
@@ -1856,6 +1856,44 @@ async function _elevenTTS(text, genCheck, onEnd, onFail){
   }
 }
 
+
+// ── Google Translate TTS（免費，不需 API key，中文品質佳，通常 <1s 回應）──
+async function _googleTTS(text, genCheck, onEnd, onFail){
+  try{
+    const shortText = preprocessTTS(text).substring(0, 180);
+    if(!shortText || !genCheck()){ onFail(); return; }
+    const url = 'https://translate.google.com/translate_tts?ie=UTF-8&tl=zh-TW&client=tw-ob&q='
+              + encodeURIComponent(shortText);
+    if(_currentTTSAudio){ _currentTTSAudio.pause(); _currentTTSAudio=null; }
+    const audio = new Audio(url);
+    _currentTTSAudio = audio;
+    let _called = false;
+    const _tmo = setTimeout(()=>{
+      if(_called) return; _called=true;
+      audio.pause(); if(_currentTTSAudio===audio)_currentTTSAudio=null;
+      console.warn('[刀疤] Google TTS 載入超時（5秒）');
+      if(genCheck()) onFail();
+    }, 5000);
+    audio.onended = ()=>{
+      if(_called) return; _called=true;
+      clearTimeout(_tmo);
+      if(_currentTTSAudio===audio)_currentTTSAudio=null;
+      onEnd();
+    };
+    audio.onerror = ()=>{
+      if(_called) return; _called=true;
+      clearTimeout(_tmo);
+      if(_currentTTSAudio===audio)_currentTTSAudio=null;
+      console.warn('[刀疤] Google TTS 播放失敗');
+      if(genCheck()) onFail();
+    };
+    await audio.play();
+  }catch(e){
+    console.warn('[刀疤] Google TTS 例外：', e.message||e);
+    if(genCheck()) onFail();
+  }
+}
+
 // ── Chrome TTS 備援：等待聲音清單載入後再朗讀 ─────────────────
 function _chromeTTSSpeak(text, onDone){
   function _doSpeak(){
@@ -1872,10 +1910,10 @@ function _chromeTTSSpeak(text, onDone){
     // 冷啟動守衛：5 秒內若 onstart 未觸發，代表 Chrome TTS 引擎卡死
     // 立刻取消並呼叫 onDone，避免延遲 10-20 秒後才播放（播放時麥克風會把 TTS 誤認成指令）
     const _coldGuard = setTimeout(()=>{
-      console.warn('[刀疤] Chrome TTS 冷啟動超時（5秒），強制取消並跳過');
+      console.warn('[刀疤] Chrome TTS 冷啟動超時（10秒），強制取消並跳過');
       window.speechSynthesis.cancel(); // 取消排隊中的 utterance，防止延遲播放干擾麥克風
       _once();
-    }, 5000);
+    }, 10000);
 
     u.onstart = ()=>{ clearTimeout(_coldGuard); }; // 正常啟動，清除冷啟動守衛
     u.onend   = ()=>{ clearTimeout(_coldGuard); _once(); };
@@ -1966,14 +2004,15 @@ function speakFeedback(text){
   const _onEndWithGuard = ()=>{ clearTimeout(_safeGuard); _onEnd(); };
 
   // ElevenLabs 可用時才嘗試，連續失敗 3 次後直接用 Chrome TTS（省去等待時間）
+  function _tryGoogle(){ _googleTTS(text, ()=>_feedbackGen===myGen, _onEndWithGuard, ()=>{ if(_feedbackGen!==myGen)return; _chromeTTSSpeak(text, _onEndWithGuard); }); }
   if(_isElevenAvailable()){
     _elevenTTS(text, ()=>_feedbackGen===myGen, _onEndWithGuard, ()=>{
       if(_feedbackGen !== myGen) return;
       _recordElevenFail(_lastElevenStatus);
-      _chromeTTSSpeak(text, _onEndWithGuard);
+      _tryGoogle();
     });
   } else {
-    _chromeTTSSpeak(text, _onEndWithGuard);
+    _tryGoogle();
   }
 }
 
@@ -2027,24 +2066,21 @@ function speakChain(text){
     _voiceChainDone();
   }, 30000);
 
-  // Chrome 分句備援（抽成內部函數，ElevenLabs 失敗或停用時都會呼叫）
+  // 分句備援（先 Google TTS，失敗才用 Chrome TTS）
   function _runChromeFallback(){
     const chunks = text.split(/(?<=[。！？!?\n])/g).map(s=>s.trim()).filter(s=>s.length>0);
     if(chunks.length===0){ _onDone(); return; }
     let idx=0;
-    _speakChainKeepAlive = setInterval(()=>{
-      if(_speakChainGen!==myGen){ clearInterval(_speakChainKeepAlive); _speakChainKeepAlive=null; return; }
-      if(window.speechSynthesis.paused) window.speechSynthesis.resume();
-    },3000);
     function next(){
       if(_speakChainGen!==myGen) return;
-      if(idx>=chunks.length||!isAwake){
-        if(_speakChainKeepAlive){clearInterval(_speakChainKeepAlive);_speakChainKeepAlive=null;}
-        _onDone(); return;
-      }
-      _chromeTTSSpeak(chunks[idx], ()=>{
+      if(idx>=chunks.length||!isAwake){ _onDone(); return; }
+      const chunk = chunks[idx];
+      _googleTTS(chunk, ()=>_speakChainGen===myGen, ()=>{
+        if(_speakChainGen!==myGen) return; idx++; next();
+      }, ()=>{
         if(_speakChainGen!==myGen) return;
-        idx++; next();
+        // Google 失敗，用 Chrome TTS
+        _chromeTTSSpeak(chunk, ()=>{ if(_speakChainGen!==myGen) return; idx++; next(); });
       });
     }
     next();
