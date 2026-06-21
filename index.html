@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>鈞曜科技 AI 秘書 v3.61</title>
+<title>鈞曜科技 AI 秘書 v3.62</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
 <style>
@@ -211,7 +211,7 @@ input:focus { outline: none; border-color: var(--info) !important; }
     <div class="logo"><i class="ti ti-robot"></i></div>
     <div class="header-text">
       <h1>鈞曜科技 AI 秘書</h1>
-      <p>會議記錄 ・ 待辦追蹤 ・ 每日晨報 ・ Outlook &nbsp;<span style="font-size:11px;background:#22c55e22;color:#22c55e;border:1px solid #22c55e44;border-radius:20px;padding:1px 8px;vertical-align:middle">v3.61</span></p>
+      <p>會議記錄 ・ 待辦追蹤 ・ 每日晨報 ・ Outlook &nbsp;<span style="font-size:11px;background:#22c55e22;color:#22c55e;border:1px solid #22c55e44;border-radius:20px;padding:1px 8px;vertical-align:middle">v3.62</span></p>
     </div>
     <div class="header-right" style="display:flex;gap:8px;align-items:center">
       <div class="api-status ok" id="api-status"><i class="ti ti-check"></i> AI 已連線</div>
@@ -1886,6 +1886,24 @@ function _chromeTTSSpeak(text, onDone){
   }
 }
 
+
+// ── 即時指令回饋音效（Web Audio API，無需任何 TTS 引擎）──────────
+function _playCommandBeep(){
+  try{
+    const ctx = new (window.AudioContext||window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(880, ctx.currentTime);
+    gain.gain.setValueAtTime(0.08, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.12);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.12);
+  }catch(e){}
+}
+
 // ── _warmupChromeTTS：頁面載入時預熱 Chrome TTS 引擎 ────────
 // 說一個靜音空格，讓 Chrome 完成引擎初始化，之後才不會有冷啟動延遲
 function _warmupChromeTTS(){
@@ -1914,12 +1932,12 @@ function speakFeedback(text){
   const myGen = _feedbackGen;
   // 停止目前所有音頻
   if(_currentTTSAudio){ _currentTTSAudio.pause(); _currentTTSAudio=null; }
-  if(window.speechSynthesis.speaking||window.speechSynthesis.pending) window.speechSynthesis.cancel();
+  // 注意：不在這裡 cancel speechSynthesis，避免取消預熱暖機 utterance 導致 TTS 引擎重新冷啟動
+  // 若有正在播放的 keepalive 靜音字，讓它自然結束（<100ms），不影響使用者體驗
   isTTSSpeaking = true;
-  _isTTSSpeakingSetAt = Date.now(); // 看門狗用：記錄開始時間
+  _isTTSSpeakingSetAt = Date.now();
   if(sleepTimeout){ clearTimeout(sleepTimeout); sleepTimeout=null; }
   // 停止語音辨識，釋放音訊資源給 TTS
-  // Chrome 的 SpeechRecognition 與 SpeechSynthesis 共用音訊，同時運行會讓 TTS 延遲啟動
   if(voiceCtrlRecognition && voiceCtrlActive){ try{ voiceCtrlRecognition.abort(); }catch(e){} }
 
   function _onEnd(){
@@ -1991,7 +2009,7 @@ function speakChain(text){
   if(voiceCtrlRecognition && voiceCtrlActive){ try{ voiceCtrlRecognition.abort(); }catch(e){} }
   _feedbackGen++;
   if(_currentTTSAudio){ _currentTTSAudio.pause(); _currentTTSAudio=null; }
-  if(window.speechSynthesis.speaking||window.speechSynthesis.pending) window.speechSynthesis.cancel();
+  // 同樣不 cancel，保持 TTS 引擎熱身狀態
 
   function _onDone(){
     if(_speakChainGen !== myGen) return;
@@ -2288,6 +2306,7 @@ function resetProcessingState(){
 }
 
 function executeVoiceCommand(cmd){
+  _playCommandBeep(); // 即時聲音回饋，讓使用者知道指令已收到
   document.getElementById('voice-ctrl-status').textContent='執行中：'+cmd;
   if(_processingGuard)clearTimeout(_processingGuard);
   _processingGuard=setTimeout(resetProcessingState,12000); // 一般指令12秒安全護衛
