@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>鈞曜科技 AI 秘書 v3.62</title>
+<title>鈞曜科技 AI 秘書 v3.64</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
 <style>
@@ -211,7 +211,7 @@ input:focus { outline: none; border-color: var(--info) !important; }
     <div class="logo"><i class="ti ti-robot"></i></div>
     <div class="header-text">
       <h1>鈞曜科技 AI 秘書</h1>
-      <p>會議記錄 ・ 待辦追蹤 ・ 每日晨報 ・ Outlook &nbsp;<span style="font-size:11px;background:#22c55e22;color:#22c55e;border:1px solid #22c55e44;border-radius:20px;padding:1px 8px;vertical-align:middle">v3.62</span></p>
+      <p>會議記錄 ・ 待辦追蹤 ・ 每日晨報 ・ Outlook &nbsp;<span style="font-size:11px;background:#22c55e22;color:#22c55e;border:1px solid #22c55e44;border-radius:20px;padding:1px 8px;vertical-align:middle">v3.64</span></p>
     </div>
     <div class="header-right" style="display:flex;gap:8px;align-items:center">
       <div class="api-status ok" id="api-status"><i class="ti ti-check"></i> AI 已連線</div>
@@ -675,7 +675,8 @@ let _ttsEngineKeepAlive=null;  // Chrome TTS 引擎保活計時器
 let _voiceWatchdog=null;        // 全域看門狗 setInterval ID
 let _feedbackGen=0;             // 每次 speakFeedback 啟動時遞增
 let _speakChainGen=0;           // 每次 speakChain 呼叫遞增
-let _elevenFailCount=0;         // ElevenLabs 連續失敗次數
+let _elevenFailCount=0;
+let _lastElevenStatus=0;       // 最近一次 ElevenLabs HTTP 狀態碼         // ElevenLabs 連續失敗次數
 let _elevenDisabledUntil=0;     // 暫停使用 ElevenLabs 的截止時間戳（毫秒）
 // ── 創意討論室 ──
 let _ideaChatHistory=[];  // 對話歷史 [{role:'user'|'assistant',content:'...'}]
@@ -1790,22 +1791,24 @@ function _restartMic(){
 // ── ElevenLabs 雲端 TTS 核心：呼叫 API 並播放音頻 ──────────
 // ElevenLabs 是否可用（連續失敗 3 次後停用 30 分鐘）
 function _isElevenAvailable(){
-  if(Date.now() < _elevenDisabledUntil) return false;
-  const key = localStorage.getItem('jyste_eleven_key')||'';
+  const saved=parseInt(localStorage.getItem('jyste_eleven_disabled_until')||'0');
+  if(saved>_elevenDisabledUntil)_elevenDisabledUntil=saved;
+  if(Date.now()<_elevenDisabledUntil)return false;
+  const key=localStorage.getItem('jyste_eleven_key')||'';
   return !!key;
 }
-function _recordElevenFail(){
-  _elevenFailCount++;
-  if(_elevenFailCount >= 3){
-    _elevenDisabledUntil = Date.now() + 30*60*1000;
-    _elevenFailCount = 0;
-    console.warn('[刀疤] ElevenLabs 連續失敗 3 次，停用 30 分鐘，直接使用本機語音');
-    const statusEl = document.getElementById('voice-ctrl-status');
-    if(statusEl && voiceCtrlActive){
-      const prev = statusEl.textContent;
-      statusEl.textContent = '⚠️ 雲端語音停用，使用本機語音（30分鐘後重試）';
-      setTimeout(()=>{ if(statusEl.textContent.includes('停用')) statusEl.textContent=prev; }, 5000);
-    }
+function _recordElevenFail(httpStatus){
+  // 401/403 = Key 失效，第一次就立即停用
+  if(httpStatus===401||httpStatus===403){
+    _elevenFailCount=99;
+  }else{
+    _elevenFailCount++;
+  }
+  if(_elevenFailCount>=3){
+    _elevenDisabledUntil=Date.now()+60*60*1000;
+    _elevenFailCount=0;
+    try{localStorage.setItem('jyste_eleven_disabled_until',String(_elevenDisabledUntil));}catch(e){}
+    console.warn('[刀疤] ElevenLabs 停用 1 小時，直接使用本機語音');
   }
 }
 function _recordElevenSuccess(){
@@ -1909,13 +1912,13 @@ function _playCommandBeep(){
 function _warmupChromeTTS(){
   function _doWarmup(){
     const voices = window.speechSynthesis.getVoices();
-    const u = new SpeechSynthesisUtterance(' ');
-    u.volume = 0; u.rate = 2; u.lang = 'zh-TW';
+    const u = new SpeechSynthesisUtterance('待命');
+    u.volume = 0; u.rate = 3; u.lang = 'zh-TW';
     const tw = voices.find(v=>v.lang==='zh-TW') || voices.find(v=>v.lang.startsWith('zh')) || null;
     if(tw) u.voice = tw;
     u.onend = ()=>{}; u.onerror = ()=>{};
     window.speechSynthesis.speak(u);
-    console.log('[刀疤] Chrome TTS 引擎預熱完成');
+    console.log('[刀疤] Chrome TTS 中文引擎預熱完成');
   }
   if(window.speechSynthesis.getVoices().length === 0){
     window.speechSynthesis.addEventListener('voiceschanged', _doWarmup, {once:true});
@@ -1937,9 +1940,6 @@ function speakFeedback(text){
   isTTSSpeaking = true;
   _isTTSSpeakingSetAt = Date.now();
   if(sleepTimeout){ clearTimeout(sleepTimeout); sleepTimeout=null; }
-  // 停止語音辨識，釋放音訊資源給 TTS
-  if(voiceCtrlRecognition && voiceCtrlActive){ try{ voiceCtrlRecognition.abort(); }catch(e){} }
-
   function _onEnd(){
     if(_feedbackGen !== myGen) return;
     isTTSSpeaking = false;
@@ -1969,7 +1969,7 @@ function speakFeedback(text){
   if(_isElevenAvailable()){
     _elevenTTS(text, ()=>_feedbackGen===myGen, _onEndWithGuard, ()=>{
       if(_feedbackGen !== myGen) return;
-      _recordElevenFail();
+      _recordElevenFail(_lastElevenStatus);
       _chromeTTSSpeak(text, _onEndWithGuard);
     });
   } else {
@@ -2005,8 +2005,6 @@ function speakChain(text){
   isTTSSpeaking = true;
   _isTTSSpeakingSetAt = Date.now(); // 看門狗用：記錄開始時間
   if(sleepTimeout){ clearTimeout(sleepTimeout); sleepTimeout=null; }
-  // 停止語音辨識，釋放音訊資源給 TTS
-  if(voiceCtrlRecognition && voiceCtrlActive){ try{ voiceCtrlRecognition.abort(); }catch(e){} }
   _feedbackGen++;
   if(_currentTTSAudio){ _currentTTSAudio.pause(); _currentTTSAudio=null; }
   // 同樣不 cancel，保持 TTS 引擎熱身狀態
@@ -2059,7 +2057,7 @@ function speakChain(text){
   }
   _elevenTTS(text, ()=>_speakChainGen===myGen, _onDone, ()=>{
     if(_speakChainGen !== myGen) return;
-    _recordElevenFail();
+    _recordElevenFail(_lastElevenStatus);
     _runChromeFallback();
   });
 }
@@ -2139,8 +2137,8 @@ function startVoiceControl(){
   if(_ttsEngineKeepAlive) clearInterval(_ttsEngineKeepAlive);
   _ttsEngineKeepAlive = setInterval(()=>{
     if(voiceCtrlActive && !isTTSSpeaking && !window.speechSynthesis.speaking){
-      const u = new SpeechSynthesisUtterance(' ');
-      u.volume = 0; u.rate = 2; u.lang = 'zh-TW';
+      const u = new SpeechSynthesisUtterance('待命');
+      u.volume = 0; u.rate = 3; u.lang = 'zh-TW';
       u.onend = ()=>{}; u.onerror = ()=>{};
       window.speechSynthesis.speak(u);
     }
