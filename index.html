@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>鈞曜科技 AI 秘書 v3.52</title>
+<title>鈞曜科技 AI 秘書 v3.54</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
 <style>
@@ -578,6 +578,8 @@ function setupRecognitionHandlers(){
       const confirmWords=['確認','對','沒錯','是的','好','OK','ok','取消','算了','不要','不用了','不對'];
       if(confirmWords.some(w=>cmd.includes(w))){
         if(isTTSSpeaking){
+          // 同時停止 ElevenLabs 音頻和 Chrome TTS
+          if(_currentTTSAudio){ _currentTTSAudio.pause(); _currentTTSAudio=null; }
           window.speechSynthesis.cancel();
           isTTSSpeaking=false;
           _feedbackGen++; // 讓舊的 speakFeedback onend 失效
@@ -1513,7 +1515,7 @@ function switchTab(tab){
 // ── 語音播報（ElevenLabs 真人音色）──────────────────
 // ElevenLabs 雲端 TTS 設定
 localStorage.setItem('jyste_eleven_key','sk_b0fb14adb69339645b4e8276c6ccb0b12c4280648446a65d');
-const ELEVEN_VOICE_ID='pqHfZKP75CvOlQylNhV4'; // Bill（多語言男聲，中文效果佳）
+const ELEVEN_VOICE_ID='21m00Tcm4TlvDq8ikWAM'; // Rachel（已確認支援中文）
 let isSpeaking=false;
 let currentAudio=null;
 let speakKeepAlive=null;
@@ -1754,10 +1756,13 @@ function stopSpeak(){
 }
 
 // ── ElevenLabs 雲端 TTS 核心：呼叫 API 並播放音頻 ──────────
-async function _elevenTTS(text, onEnd, onFail){
+async function _elevenTTS(text, genCheck, onEnd, onFail){
   const key = localStorage.getItem('jyste_eleven_key')||'';
   if(!key){ onFail(); return; }
   try{
+    // 10 秒 fetch 超時，避免網路卡住時長期佔用 isTTSSpeaking
+    const controller = new AbortController();
+    const _fetchTimeout = setTimeout(()=>controller.abort(), 10000);
     const resp = await fetch(
       `https://api.elevenlabs.io/v1/text-to-speech/${ELEVEN_VOICE_ID}`,
       { method:'POST',
@@ -1766,11 +1771,14 @@ async function _elevenTTS(text, onEnd, onFail){
           text: preprocessTTS(text),
           model_id:'eleven_multilingual_v2',
           voice_settings:{stability:0.5,similarity_boost:0.8,speed:1.1}
-        })
+        }),
+        signal: controller.signal
       }
     );
+    clearTimeout(_fetchTimeout);
     if(!resp.ok) throw new Error('ElevenLabs HTTP '+resp.status);
     const blob = await resp.blob();
+    if(!genCheck()){ return; } // 世代已過期，丟棄結果
     const url = URL.createObjectURL(blob);
     if(_currentTTSAudio){ _currentTTSAudio.pause(); _currentTTSAudio=null; }
     const audio = new Audio(url);
@@ -1779,8 +1787,8 @@ async function _elevenTTS(text, onEnd, onFail){
     audio.onerror = ()=>{ URL.revokeObjectURL(url); if(_currentTTSAudio===audio)_currentTTSAudio=null; onEnd(); };
     audio.play();
   }catch(e){
-    console.warn('ElevenLabs TTS 失敗，切換 Chrome TTS：',e);
-    onFail();
+    console.warn('ElevenLabs TTS 失敗：',e);
+    if(genCheck()) onFail();
   }
 }
 
@@ -1808,16 +1816,24 @@ function speakFeedback(text){
     sleepTimeout = setTimeout(()=>{ setAwakeMode(false); speakFeedback('我先休息一下 需要的時候叫我'); }, delay);
   }
 
-  // 優先用 ElevenLabs，失敗時備援 Chrome TTS
-  _elevenTTS(text, _onEnd, ()=>{
+  // 12 秒安全守衛：強制解除卡住的 isTTSSpeaking 狀態
+  const _safeGuard = setTimeout(()=>{
     if(_feedbackGen !== myGen) return;
-    // Chrome TTS 備援
+    console.warn('speakFeedback 安全守衛觸發，強制重置');
+    _feedbackGen++; // 讓已在路上的 ElevenLabs 回傳結果失效，不播放舊音頻
+    _onEnd();
+  }, 12000);
+  const _onEndWithGuard = ()=>{ clearTimeout(_safeGuard); _onEnd(); };
+
+  // 優先用 ElevenLabs，失敗時備援 Chrome TTS
+  _elevenTTS(text, ()=>_feedbackGen===myGen, _onEndWithGuard, ()=>{
+    if(_feedbackGen !== myGen) return;
     const u = new SpeechSynthesisUtterance(preprocessTTS(text));
     u.lang='zh-TW'; u.rate=1.2; u.pitch=1.05;
     const tw = window.speechSynthesis.getVoices().find(v=>v.lang==='zh-TW')||null;
     if(tw) u.voice=tw;
-    u.onend=_onEnd;
-    u.onerror=(e)=>{ if(e.error==='canceled'||e.error==='interrupted')return; _onEnd(); };
+    u.onend=_onEndWithGuard;
+    u.onerror=(e)=>{ if(e.error==='canceled'||e.error==='interrupted')return; _onEndWithGuard(); };
     window.speechSynthesis.speak(u);
   });
 }
@@ -1856,11 +1872,22 @@ function speakChain(text){
 
   function _onDone(){
     if(_speakChainGen !== myGen) return;
+    if(_chainSafeGuard){clearTimeout(_chainSafeGuard);_chainSafeGuard=null;}
     _voiceChainDone();
   }
 
+  // 30 秒安全守衛：避免 speakChain 長時間卡住 isTTSSpeaking
+  let _chainSafeGuard = setTimeout(()=>{
+    if(_speakChainGen !== myGen) return;
+    console.warn('speakChain 安全守衛觸發，強制重置');
+    _speakChainGen++; // 讓舊的 ElevenLabs 結果失效
+    _feedbackGen++;
+    if(_speakChainKeepAlive){clearInterval(_speakChainKeepAlive);_speakChainKeepAlive=null;}
+    _voiceChainDone();
+  }, 30000);
+
   // 優先用 ElevenLabs（整段文字一次送），失敗時備援 Chrome 分句
-  _elevenTTS(text, _onDone, ()=>{
+  _elevenTTS(text, ()=>_speakChainGen===myGen, _onDone, ()=>{
     if(_speakChainGen !== myGen) return;
     // Chrome TTS 備援：分句朗讀
     const chunks = text.split(/(?<=[。！？!?\n])/g).map(s=>s.trim()).filter(s=>s.length>0);
@@ -2374,29 +2401,38 @@ function executeVoiceCommand(cmd){
   else if(['再見','掰掰','拜拜','結束對話','掰了','bye'].some(w=>cmd.includes(w))){
     if(_processingGuard){clearTimeout(_processingGuard);_processingGuard=null;}
     if(sleepTimeout){clearTimeout(sleepTimeout);sleepTimeout=null;}
-    // 先說再見（isAwake 還是 true），說完後由 speakFeedback.onend 重啟麥克風
-    // 這裡加入特殊再見文字讓休眠後的 speakFeedback 也能播放
     const goodbyes=['好的 有需要再叫我 再見 bruce哥','掰掰 bruce哥 有事找我','好 我先待命 需要的時候叫我'];
     const msg=goodbyes[Math.floor(Math.random()*goodbyes.length)];
-    setAwakeMode(false); // 先切換狀態
+    setAwakeMode(false); // 先切換待機狀態
     _feedbackGen++;
     const myGen=_feedbackGen;
     isTTSSpeaking=true;
-    const u=new SpeechSynthesisUtterance(preprocessTTS(msg));
-    u.lang='zh-TW';
-    u.rate=parseFloat(document.getElementById('voice-speed').value)||1.3;
-    u.pitch=1.05;
-    const tw=window.speechSynthesis.getVoices().find(v=>v.lang==='zh-TW')||null;
-    if(tw)u.voice=tw;
-    u.onend=()=>{
+    // 8 秒安全守衛
+    const _byeGuard=setTimeout(()=>{
       if(_feedbackGen!==myGen)return;
-      isTTSSpeaking=false;
-      isProcessing=false;
+      _feedbackGen++;
+      isTTSSpeaking=false; isProcessing=false;
       if(voiceCtrlActive&&voiceCtrlRecognition){try{voiceCtrlRecognition.start();}catch(e){}}
-    };
-    u.onerror=(e)=>{if(e.error==='canceled'||e.error==='interrupted')return; u.onend();};
-    window.speechSynthesis.cancel();
-    window.speechSynthesis.speak(u);
+    },8000);
+    function _onByeEnd(){
+      clearTimeout(_byeGuard);
+      if(_feedbackGen!==myGen)return;
+      isTTSSpeaking=false; isProcessing=false;
+      if(voiceCtrlActive&&voiceCtrlRecognition){try{voiceCtrlRecognition.start();}catch(e){}}
+    }
+    // 優先 ElevenLabs，失敗備援 Chrome TTS
+    _elevenTTS(msg, ()=>_feedbackGen===myGen, _onByeEnd, ()=>{
+      if(_feedbackGen!==myGen)return;
+      if(_currentTTSAudio){_currentTTSAudio.pause();_currentTTSAudio=null;}
+      window.speechSynthesis.cancel();
+      const u=new SpeechSynthesisUtterance(preprocessTTS(msg));
+      u.lang='zh-TW'; u.rate=1.2; u.pitch=1.05;
+      const tw=window.speechSynthesis.getVoices().find(v=>v.lang==='zh-TW')||null;
+      if(tw)u.voice=tw;
+      u.onend=_onByeEnd;
+      u.onerror=(e)=>{if(e.error==='canceled'||e.error==='interrupted')return; _onByeEnd();};
+      window.speechSynthesis.speak(u);
+    });
   }
 
   // ── 未知指令：有 API Key 就交給 AI 回答，否則給提示 ──────────
