@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>鈞曜科技 AI 秘書 v3.50</title>
+<title>鈞曜科技 AI 秘書 v3.51</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
 <style>
@@ -1767,9 +1767,6 @@ function speakFeedback(text){
     const tw = voices.find(v=>v.lang==='zh-TW')||voices.find(v=>v.lang.startsWith('zh'))||null;
     if(tw) u.voice = tw;
     window.speechSynthesis.speak(u);
-    // Chrome fix：speak() 後立刻 pause()+resume() 強制引擎立刻開始播放，避免 20 秒延遲 bug
-    window.speechSynthesis.pause();
-    window.speechSynthesis.resume();
   }
   u.onend = ()=>{
     if(_feedbackGen !== myGen) return; // 已被 speakChain 或新的 speakFeedback 取代
@@ -1881,9 +1878,6 @@ function speakChain(text){
     u.onend = ()=>{ if(_speakChainGen!==myGen)return; idx++; next(); };
     u.onerror = (e)=>{ if(_speakChainGen!==myGen)return; if(e.error==='canceled'||e.error==='interrupted')return; idx++; next(); };
     window.speechSynthesis.speak(u);
-    // Chrome fix：強制引擎立刻開始播放
-    window.speechSynthesis.pause();
-    window.speechSynthesis.resume();
   }
 
   // 只有 cancel 過才等 50ms，否則直接開始
@@ -2133,8 +2127,10 @@ function executeVoiceCommand(cmd){
       return;
     } else if(['取消','算了','不要','不用了','不對'].some(w=>cmd.includes(w))){
       if(_processingGuard){clearTimeout(_processingGuard);_processingGuard=null;}
-      clearVoicePending();
-      speakFeedback('好的 已取消');
+      voicePendingConfirm=null; // 直接清除，不設冷卻期
+      voicePendingAdd=false;
+      // 給 Chrome 150ms 緩衝，避免剛做過 cancel() 後馬上 speak() 衝突
+      setTimeout(()=>speakFeedback('好的 已取消'), 150);
       return;
     }
   }
