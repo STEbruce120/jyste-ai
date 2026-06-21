@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>鈞曜科技 AI 秘書 v3.55</title>
+<title>鈞曜科技 AI 秘書 v3.56</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
 <style>
@@ -1769,7 +1769,7 @@ async function _elevenTTS(text, genCheck, onEnd, onFail){
         headers:{'xi-api-key':key,'Content-Type':'application/json','Accept':'audio/mpeg'},
         body:JSON.stringify({
           text: preprocessTTS(text),
-          model_id:'eleven_multilingual_v2',
+          model_id:'eleven_turbo_v2_5',  // turbo 模型：0.5~1s 回應，比 multilingual_v2 快 3~5 倍
           voice_settings:{stability:0.5,similarity_boost:0.8,speed:1.1}
         }),
         signal: controller.signal
@@ -1983,11 +1983,35 @@ function startVoiceControl(){
   setupRecognitionHandlers();
   voiceCtrlRecognition.start();
 
-  // Chrome TTS 引擎保活：每 5 秒呼叫 resume()，防止引擎休眠導致延遲
+  // Chrome TTS 引擎預熱：講一句無聲的話，讓引擎立刻初始化，避免冷啟動 10~20 秒延遲
+  function _warmupChromeTTS(){
+    const voices = window.speechSynthesis.getVoices();
+    if(voices.length === 0){
+      // 尚未載入聲音清單，等載入後再預熱
+      window.speechSynthesis.addEventListener('voiceschanged', _warmupChromeTTS, {once:true});
+      return;
+    }
+    const wu = new SpeechSynthesisUtterance('​'); // zero-width space：無聲但能喚醒引擎
+    wu.volume = 0;
+    wu.rate = 2;
+    const tw = voices.find(v=>v.lang==='zh-TW');
+    if(tw) wu.voice = tw;
+    wu.onend = ()=>{};
+    wu.onerror = ()=>{};
+    window.speechSynthesis.speak(wu);
+  }
+  setTimeout(_warmupChromeTTS, 500); // 延遲 500ms 讓 recognition 先啟動再預熱
+
+  // Chrome TTS 引擎保活：每 5s resume() + 每 60s 補說一次無聲語句，確保引擎不休眠
   if(_ttsEngineKeepAlive) clearInterval(_ttsEngineKeepAlive);
+  let _warmupCounter = 0;
   _ttsEngineKeepAlive = setInterval(()=>{
     if(voiceCtrlActive && !isTTSSpeaking){
       window.speechSynthesis.resume();
+      _warmupCounter++;
+      if(_warmupCounter % 12 === 0){ // 每 60 秒（12×5s）重新預熱一次
+        _warmupChromeTTS();
+      }
     }
   }, 5000);
 }
