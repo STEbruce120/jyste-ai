@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>鈞曜科技 AI 秘書 v3.54</title>
+<title>鈞曜科技 AI 秘書 v3.55</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
 <style>
@@ -1820,8 +1820,8 @@ function speakFeedback(text){
   const _safeGuard = setTimeout(()=>{
     if(_feedbackGen !== myGen) return;
     console.warn('speakFeedback 安全守衛觸發，強制重置');
-    _feedbackGen++; // 讓已在路上的 ElevenLabs 回傳結果失效，不播放舊音頻
-    _onEnd();
+    _onEnd();        // 先清理狀態（此時 _feedbackGen===myGen，通過世代檢查）
+    _feedbackGen++;  // 再遞增，讓後續 Chrome TTS onend 不再重複呼叫 _onEnd
   }, 12000);
   const _onEndWithGuard = ()=>{ clearTimeout(_safeGuard); _onEnd(); };
 
@@ -1843,6 +1843,10 @@ function _voiceChainDone(){
   isTTSSpeaking = false;
   isProcessing = false;
   _ideaSending = false;
+  // 無論是否處於喚醒狀態，都要確保麥克風重啟（待機也需要繼續聆聽喚醒詞）
+  if(voiceCtrlActive && voiceCtrlRecognition){
+    setTimeout(()=>{ try{ voiceCtrlRecognition.start(); }catch(e){}}, 400);
+  }
   if(!isAwake) return;
   document.getElementById('voice-ctrl-status').textContent='刀疤已喚醒 請說指令 說「再見」結束對話';
   if(sleepTimeout) clearTimeout(sleepTimeout);
@@ -1851,9 +1855,6 @@ function _voiceChainDone(){
     setAwakeMode(false);
     speakFeedback('我先休息一下 需要的時候叫我');
   }, delay);
-  if(voiceCtrlActive && voiceCtrlRecognition){
-    setTimeout(()=>{ try{ voiceCtrlRecognition.start(); }catch(e){}}, 400);
-  }
 }
 
 // ── speakChain：長文 TTS（ElevenLabs 一次送完，Chrome 備援分句）──
@@ -1891,7 +1892,7 @@ function speakChain(text){
     if(_speakChainGen !== myGen) return;
     // Chrome TTS 備援：分句朗讀
     const chunks = text.split(/(?<=[。！？!?\n])/g).map(s=>s.trim()).filter(s=>s.length>0);
-    if(chunks.length===0){ _voiceChainDone(); return; }
+    if(chunks.length===0){ _onDone(); return; }
     let idx=0;
     _speakChainKeepAlive = setInterval(()=>{
       if(_speakChainGen!==myGen){ clearInterval(_speakChainKeepAlive); _speakChainKeepAlive=null; return; }
@@ -1901,7 +1902,7 @@ function speakChain(text){
       if(_speakChainGen!==myGen) return;
       if(idx>=chunks.length||!isAwake){
         if(_speakChainKeepAlive){clearInterval(_speakChainKeepAlive);_speakChainKeepAlive=null;}
-        _voiceChainDone(); return;
+        _onDone(); return; // 統一經過 _onDone 清除 _chainSafeGuard
       }
       const u=new SpeechSynthesisUtterance(preprocessTTS(chunks[idx]));
       u.lang='zh-TW'; u.rate=1.2; u.pitch=1.05;
