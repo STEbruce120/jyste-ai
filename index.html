@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>鈞曜科技 AI 秘書 v3.65</title>
+<title>鈞曜科技 AI 秘書 v3.66</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
 <style>
@@ -211,7 +211,7 @@ input:focus { outline: none; border-color: var(--info) !important; }
     <div class="logo"><i class="ti ti-robot"></i></div>
     <div class="header-text">
       <h1>鈞曜科技 AI 秘書</h1>
-      <p>會議記錄 ・ 待辦追蹤 ・ 每日晨報 ・ Outlook &nbsp;<span style="font-size:11px;background:#22c55e22;color:#22c55e;border:1px solid #22c55e44;border-radius:20px;padding:1px 8px;vertical-align:middle">v3.65</span></p>
+      <p>會議記錄 ・ 待辦追蹤 ・ 每日晨報 ・ Outlook &nbsp;<span style="font-size:11px;background:#22c55e22;color:#22c55e;border:1px solid #22c55e44;border-radius:20px;padding:1px 8px;vertical-align:middle">v3.66</span></p>
     </div>
     <div class="header-right" style="display:flex;gap:8px;align-items:center">
       <div class="api-status ok" id="api-status"><i class="ti ti-check"></i> AI 已連線</div>
@@ -1859,38 +1859,35 @@ async function _elevenTTS(text, genCheck, onEnd, onFail){
 
 // ── Google Translate TTS（免費，不需 API key，中文品質佳，通常 <1s 回應）──
 async function _googleTTS(text, genCheck, onEnd, onFail){
+  // _called 保證 onEnd/onFail 只會被呼叫一次，避免重複發聲
+  let _called=false, _tmo=null, _audio=null;
+  function _ok(){
+    if(_called)return; _called=true; clearTimeout(_tmo);
+    if(_currentTTSAudio===_audio)_currentTTSAudio=null;
+    onEnd();
+  }
+  function _fail(){
+    if(_called)return; _called=true; clearTimeout(_tmo);
+    if(_audio){try{_audio.pause();}catch(e){}}
+    if(_currentTTSAudio===_audio)_currentTTSAudio=null;
+    console.warn('[刀疤] Google TTS 失敗，切換 Chrome TTS');
+    if(genCheck()) onFail();
+  }
   try{
     const shortText = preprocessTTS(text).substring(0, 180);
     if(!shortText || !genCheck()){ onFail(); return; }
     const url = 'https://translate.google.com/translate_tts?ie=UTF-8&tl=zh-TW&client=tw-ob&q='
               + encodeURIComponent(shortText);
     if(_currentTTSAudio){ _currentTTSAudio.pause(); _currentTTSAudio=null; }
-    const audio = new Audio(url);
-    _currentTTSAudio = audio;
-    let _called = false;
-    const _tmo = setTimeout(()=>{
-      if(_called) return; _called=true;
-      audio.pause(); if(_currentTTSAudio===audio)_currentTTSAudio=null;
-      console.warn('[刀疤] Google TTS 載入超時（5秒）');
-      if(genCheck()) onFail();
-    }, 5000);
-    audio.onended = ()=>{
-      if(_called) return; _called=true;
-      clearTimeout(_tmo);
-      if(_currentTTSAudio===audio)_currentTTSAudio=null;
-      onEnd();
-    };
-    audio.onerror = ()=>{
-      if(_called) return; _called=true;
-      clearTimeout(_tmo);
-      if(_currentTTSAudio===audio)_currentTTSAudio=null;
-      console.warn('[刀疤] Google TTS 播放失敗');
-      if(genCheck()) onFail();
-    };
-    await audio.play();
+    _audio = new Audio(url);
+    _currentTTSAudio = _audio;
+    _audio.onended = _ok;
+    _audio.onerror = _fail;
+    _tmo = setTimeout(_fail, 5000);
+    await _audio.play();
   }catch(e){
     console.warn('[刀疤] Google TTS 例外：', e.message||e);
-    if(genCheck()) onFail();
+    _fail();
   }
 }
 
