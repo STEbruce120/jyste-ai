@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>鈞曜科技 AI 秘書 v3.67</title>
+<title>鈞曜科技 AI 秘書 v3.68</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
 <style>
@@ -90,6 +90,7 @@ input:focus { outline: none; border-color: var(--info) !important; }
 .cat-mfg { background: rgba(245,158,11,0.15); color: var(--warning); }
 .cat-tw { background: rgba(34,197,94,0.15); color: var(--success); }
 .cat-global { background: rgba(59,130,246,0.15); color: var(--info); }
+.cat-finance { background: rgba(245,158,11,0.15); color: var(--warning); }
 .cat-tech { background: rgba(168,85,247,0.15); color: var(--purple); }
 .news-title { font-size: 14px; font-weight: 500; cursor: pointer; line-height: 1.4; }
 .news-title:hover { color: var(--info); }
@@ -211,7 +212,7 @@ input:focus { outline: none; border-color: var(--info) !important; }
     <div class="logo"><i class="ti ti-robot"></i></div>
     <div class="header-text">
       <h1>鈞曜科技 AI 秘書</h1>
-      <p>會議記錄 ・ 待辦追蹤 ・ 每日晨報 ・ Outlook &nbsp;<span style="font-size:11px;background:#22c55e22;color:#22c55e;border:1px solid #22c55e44;border-radius:20px;padding:1px 8px;vertical-align:middle">v3.67</span></p>
+      <p>會議記錄 ・ 待辦追蹤 ・ 每日晨報 ・ Outlook &nbsp;<span style="font-size:11px;background:#22c55e22;color:#22c55e;border:1px solid #22c55e44;border-radius:20px;padding:1px 8px;vertical-align:middle">v3.68</span></p>
     </div>
     <div class="header-right" style="display:flex;gap:8px;align-items:center">
       <div class="api-status ok" id="api-status"><i class="ti ti-check"></i> AI 已連線</div>
@@ -959,9 +960,14 @@ async function loadNews(voiceMode=false){
       {cat:'製造業/自動化',cls:'cat-mfg',
        urls:['https://www.digitimes.com.tw/rss/rss.asp',
              GN+encodeURIComponent('製造業 自動化 台灣')]},
+      {cat:'國內財經',cls:'cat-finance',
+       urls:['https://udn.com/rssfeed/news/2/6644?ch=money',
+             'https://www.cnyes.com/rss/cat/headline',
+             GN+encodeURIComponent('台灣 股市 財經 投資 金融')]},
       {cat:'國際財經',cls:'cat-global',
-       urls:['https://ec.ltn.com.tw/rss/business.xml',
-             GN+encodeURIComponent('國際 財經 金融')]}
+       urls:['https://www.cnyes.com/rss/cat/fd_intl_futures',
+             'https://ec.ltn.com.tw/rss/business.xml',
+             GN+encodeURIComponent('國際 財經 美股 金融 外匯')]}
     ];
 
     async function fetchRSS(url){
@@ -1008,10 +1014,10 @@ async function loadNews(voiceMode=false){
     // RSS 全部失敗時，用 Groq AI 補充（需有 API Key）
     if(allNews.length===0){
       if(!apiKey){throw new Error('RSS 來源暫時無法連線，請稍後再試或設定 Groq API Key 使用 AI 新聞');}
-      const res=await callGemini(`你是新聞助理。請提供10則重要新聞，分四類：製造業/自動化、台灣經濟/商業、國際財經、科技/AI。JSON格式：{"news":[{"cat":"製造業/自動化","title":"標題","source":"媒體","summary":"摘要"}]}`);
+      const res=await callGemini(`你是新聞助理。請提供10則重要新聞，分五類：製造業/自動化、台灣經濟/商業、國內財經、國際財經、科技/AI。JSON格式：{"news":[{"cat":"製造業/自動化","title":"標題","source":"媒體","summary":"摘要"}]}`);
       try{
         const parsed=JSON.parse(res.replace(/```json|```/g,'').trim());
-        const catCls={'製造業/自動化':'cat-mfg','台灣經濟/商業':'cat-tw','國際財經':'cat-global','科技/AI':'cat-tech'};
+        const catCls={'製造業/自動化':'cat-mfg','台灣經濟/商業':'cat-tw','國際財經':'cat-global','科技/AI':'cat-tech','國內財經':'cat-finance'};
         parsed.news.forEach(n=>allNews.push({cat:n.cat,cls:catCls[n.cat]||'cat-global',title:n.title,source:n.source,summary:n.summary,url:'',publishedAt:''}));
       }catch(e){}
     }
