@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>鈞曜科技 AI 秘書 v3.79</title>
+<title>鈞曜科技 AI 秘書 v3.80</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
@@ -253,7 +253,7 @@ input:focus { outline: none; border-color: var(--info) !important; }
     <div class="logo"><i class="ti ti-robot"></i></div>
     <div class="header-text">
       <h1>鈞曜科技 AI 秘書</h1>
-      <p>會議記錄 ・ 待辦追蹤 ・ 每日晨報 ・ Outlook &nbsp;<span style="font-size:11px;background:#22c55e22;color:#22c55e;border:1px solid #22c55e44;border-radius:20px;padding:1px 8px;vertical-align:middle">v3.79</span></p>
+      <p>會議記錄 ・ 待辦追蹤 ・ 每日晨報 ・ Outlook &nbsp;<span style="font-size:11px;background:#22c55e22;color:#22c55e;border:1px solid #22c55e44;border-radius:20px;padding:1px 8px;vertical-align:middle">v3.80</span></p>
     </div>
     <div class="header-right" style="display:flex;gap:8px;align-items:center">
       <div class="api-status ok" id="api-status"><i class="ti ti-check"></i> AI 已連線</div>
@@ -1478,6 +1478,147 @@ function scheduleNotif(urgent){
   if(Notification.permission!=='granted'||!urgent.length)return;
   const body=urgent.map(t=>{const d=daysUntil(t.date);return`・${t.text}（${d===0?'今天到期':d===1?'明天到期':d+'天後到期'}）`;}).join('\n');
   setTimeout(()=>new Notification('⚠️ 待辦事項到期提醒',{body}),800);
+}
+
+async function processQuickCmd(){
+  const input = document.getElementById('cmd-input');
+  const resultEl = document.getElementById('cmd-result');
+  const cmd = input.value.trim();
+  if(!cmd) return;
+
+  const btn = document.getElementById('cmd-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="ti ti-loader-2"></i> 處理中...';
+  resultEl.className = 'cmd-result';
+  resultEl.style.display = 'block';
+  resultEl.textContent = '⏳ AI 解析中...';
+
+  function showResult(msg, isWarn){
+    resultEl.className = 'cmd-result' + (isWarn ? ' warn' : '');
+    resultEl.style.display = 'block';
+    resultEl.innerHTML = msg;
+    btn.disabled = false;
+    btn.innerHTML = '<i class="ti ti-sparkles"></i> AI執行';
+  }
+
+  try{
+    // ── 1. 新增待辦 ──────────────────────
+    const addMatch = cmd.match(/^(新增|加入|加個|幫我加|提醒我?|記一下|記錄)?(.+?)待辦$|^(新增|加入|加個|幫我加|提醒我?|記一下|記錄)(.+)/);
+    if(/新增|加入|加個|幫我加|提醒我?|記一下|記錄/.test(cmd)){
+      const taskRaw = cmd.replace(/^(新增|加入|加個|幫我加|提醒我?|記一下|記錄)/,'').trim();
+      const date = parseVoiceDate(taskRaw);
+      const task = taskRaw
+        .replace(/今天|明天|後天|大後天|月底|下週[一二三四五六日]|下星期[一二三四五六日]|這週[一二三四五六日]|這星期[一二三四五六日]|星期[一二三四五六日]|\d{1,2}月\d{1,2}[號日]?/g,'')
+        .replace(/^\s*(要|去|跟|幫|把|的)\s*/,'').replace(/\s+/g,' ').trim();
+      if(task){
+        const todo = {id:Date.now(), text:task, person:'', date:date, time:'', done:false};
+        todos.push(todo);
+        sbInsert('todos', todo).catch(()=>{});
+        saveData(); renderTodos(); updateMorningStats(); checkReminders();
+        input.value = '';
+        showResult('✅ 已新增待辦：<strong>'+task+'</strong>'+(date?' | 日期：'+date:''));
+        return;
+      }
+    }
+
+    // ── 2. 查詢今天/明天/待辦 ────────────
+    if(/今天有什麼|今天的事|今日|今天幾件|明天有什麼|明天的事|有幾件|幾個待辦|待辦清單|所有待辦/.test(cmd)){
+      const now = new Date();
+      const pad = n=>String(n).padStart(2,'0');
+      const today = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
+      const tom = new Date(now); tom.setDate(tom.getDate()+1);
+      const tomorrow = `${tom.getFullYear()}-${pad(tom.getMonth()+1)}-${pad(tom.getDate())}`;
+      const isTomQuery = /明天/.test(cmd);
+      const target = isTomQuery ? tomorrow : today;
+      const filtered = todos.filter(t=>!t.done && (!t.date || t.date===target));
+      const label = isTomQuery ? '明天' : '今天';
+      if(filtered.length===0){ showResult('📋 '+label+'沒有待辦事項'); return; }
+      let html = '📋 <strong>'+label+'待辦（'+filtered.length+'件）</strong><ul style="margin:6px 0 0 0;padding-left:20px">';
+      filtered.forEach(t=>{ html += '<li>'+t.text+(t.date?' <small>('+t.date+')</small>':'')+'</li>'; });
+      html += '</ul>';
+      showResult(html); return;
+    }
+
+    // ── 3. 最重要/優先事項 ───────────────
+    if(/最重要|最急|最優先|最緊急/.test(cmd)){
+      const pending = todos.filter(t=>!t.done);
+      if(pending.length===0){ showResult('📋 目前沒有未完成的待辦事項'); return; }
+      const withDate = pending.filter(t=>t.date).sort((a,b)=>a.date.localeCompare(b.date));
+      const noDate = pending.filter(t=>!t.date);
+      const top = (withDate.length ? withDate : noDate).slice(0,3);
+      let html = '🔥 <strong>最優先待辦</strong><ul style="margin:6px 0 0 0;padding-left:20px">';
+      top.forEach(t=>{ html += '<li>'+t.text+(t.date?' <small>('+t.date+')</small>':'')+'</li>'; });
+      html += '</ul>';
+      showResult(html); return;
+    }
+
+    // ── 4. 天氣 ────────────────────────
+    if(/天氣|氣溫|下雨|颱風|幾度/.test(cmd)){
+      showResult('🌤️ 查詢天氣中...', false);
+      await loadWeather('', 0, false);
+      switchTab('home');
+      showResult('🌤️ 已更新天氣資訊，請看首頁天氣區塊');
+      return;
+    }
+
+    // ── 5. 完成待辦 ──────────────────────
+    if(/完成|打勾|已做|做完|搞定/.test(cmd)){
+      const keyword = cmd.replace(/完成|打勾|已做|做完|搞定|把|幫我|標記為/g,'').trim();
+      const found = todos.find(t=>!t.done && t.text.includes(keyword));
+      if(found){
+        found.done = true;
+        if(!_completedToday.find(x=>x.id===found.id)) _completedToday.push({...found});
+        sbUpdate('todos', found.id, {done:true}).catch(()=>{});
+        saveData(); renderTodos(); updateMorningStats();
+        input.value = '';
+        showResult('✅ 已完成：<strong>'+found.text+'</strong>'); return;
+      }
+      showResult('⚠️ 找不到包含「'+keyword+'」的待辦事項', true); return;
+    }
+
+    // ── 6. 刪除待辦 ──────────────────────
+    if(/刪除|刪掉|移除|取消(?!語音)/.test(cmd)){
+      const keyword = cmd.replace(/刪除|刪掉|移除|取消|把|幫我/g,'').trim();
+      const found = todos.find(t=>t.text.includes(keyword));
+      if(found){
+        todos = todos.filter(t=>String(t.id)!==String(found.id));
+        sbDelete('todos', found.id).catch(()=>{});
+        saveData(); renderTodos(); updateMorningStats();
+        input.value = '';
+        showResult('🗑️ 已刪除：<strong>'+found.text+'</strong>'); return;
+      }
+      showResult('⚠️ 找不到包含「'+keyword+'」的待辦事項', true); return;
+    }
+
+    // ── 7. 統計/摘要 ─────────────────────
+    if(/幾件|幾個|多少|統計|摘要|概況/.test(cmd)){
+      const total = todos.filter(t=>!t.done).length;
+      const done = todos.filter(t=>t.done).length;
+      const now = new Date();
+      const pad = n=>String(n).padStart(2,'0');
+      const today = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
+      const overdue = todos.filter(t=>!t.done && t.date && t.date < today).length;
+      showResult(`📊 <strong>待辦統計</strong>：未完成 <strong>${total}</strong> 件、已完成 ${done} 件${overdue?'、<span style="color:var(--danger)">已逾期 '+overdue+' 件</span>':''}`);
+      return;
+    }
+
+    // ── 8. 其他：用 AI 回答 ──────────────
+    if(!apiKey){ showResult('⚠️ 請先設定 API Key 才能使用 AI 問答功能', true); return; }
+    const todosContext = todos.filter(t=>!t.done).slice(0,10).map(t=>t.text+(t.date?' ('+t.date+')':'')).join('、');
+    const aiPrompt = `你是鈞曜科技總經理Bruce的AI秘書。
+目前未完成待辦事項：${todosContext||'無'}
+今天日期：${new Date().toLocaleDateString('zh-TW')}
+用戶指令：${cmd}
+請用繁體中文、簡短直接地回答（100字以內）。`;
+    const reply = await callGemini(aiPrompt);
+    input.value = '';
+    const replyHtml = reply.split('\n').join('<br>'); showResult('🤖 ' + replyHtml);
+
+  }catch(e){
+    showResult('❌ 發生錯誤：' + (e.message||e), true);
+    btn.disabled = false;
+    btn.innerHTML = '<i class="ti ti-sparkles"></i> AI執行';
+  }
 }
 
 async function addTodo(){
