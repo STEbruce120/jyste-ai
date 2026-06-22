@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>鈞曜科技 AI 秘書 v3.68</title>
+<title>鈞曜科技 AI 秘書 v3.69</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
 <style>
@@ -212,7 +212,7 @@ input:focus { outline: none; border-color: var(--info) !important; }
     <div class="logo"><i class="ti ti-robot"></i></div>
     <div class="header-text">
       <h1>鈞曜科技 AI 秘書</h1>
-      <p>會議記錄 ・ 待辦追蹤 ・ 每日晨報 ・ Outlook &nbsp;<span style="font-size:11px;background:#22c55e22;color:#22c55e;border:1px solid #22c55e44;border-radius:20px;padding:1px 8px;vertical-align:middle">v3.68</span></p>
+      <p>會議記錄 ・ 待辦追蹤 ・ 每日晨報 ・ Outlook &nbsp;<span style="font-size:11px;background:#22c55e22;color:#22c55e;border:1px solid #22c55e44;border-radius:20px;padding:1px 8px;vertical-align:middle">v3.69</span></p>
     </div>
     <div class="header-right" style="display:flex;gap:8px;align-items:center">
       <div class="api-status ok" id="api-status"><i class="ti ti-check"></i> AI 已連線</div>
@@ -1369,6 +1369,51 @@ async function deleteTodo(id){
   try{await sbDelete('todos',id);}catch(e){}
 }
 
+function editTodo(id){
+  const t=todos.find(x=>x.id===id);
+  if(!t)return;
+  const el=document.querySelector(`.todo-item[data-id="${id}"]`);
+  if(!el)return;
+  const esc=s=>(s||'').replace(/"/g,'&quot;');
+  el.innerHTML=`
+    <div style="flex:1;width:100%">
+      <input id="et-text-${id}" type="text" value="${esc(t.text)}"
+        style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg3);color:var(--text);font-size:14px;box-sizing:border-box" />
+      <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;align-items:center">
+        <input id="et-person-${id}" type="text" value="${esc(t.person)}" placeholder="負責人"
+          style="flex:1;min-width:80px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg3);color:var(--text);font-size:12px" />
+        <input id="et-date-${id}" type="date" value="${t.date||''}"
+          style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg3);color:var(--text);font-size:12px" />
+        <input id="et-time-${id}" type="time" value="${t.time||''}"
+          style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg3);color:var(--text);font-size:12px" />
+      </div>
+      <div style="display:flex;gap:6px;margin-top:8px">
+        <button class="btn-primary" style="padding:5px 14px;font-size:13px" onclick="saveTodo(${id})">
+          <i class="ti ti-check"></i> 儲存
+        </button>
+        <button onclick="renderTodos()"
+          style="padding:5px 14px;font-size:13px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;cursor:pointer;color:var(--text)">
+          取消
+        </button>
+      </div>
+    </div>`;
+  document.getElementById('et-text-'+id)?.focus();
+}
+
+function saveTodo(id){
+  const t=todos.find(x=>x.id===id);
+  if(!t)return;
+  const text=document.getElementById('et-text-'+id)?.value.trim();
+  if(text)t.text=text;
+  t.person=document.getElementById('et-person-'+id)?.value.trim()||'';
+  t.date=document.getElementById('et-date-'+id)?.value||'';
+  t.time=document.getElementById('et-time-'+id)?.value||'';
+  saveData();
+  sbUpdate('todos',id,{text:t.text,person:t.person,date:t.date,time:t.time}).catch(()=>{});
+  renderTodos();updateMorningStats();
+  showToast('待辦已更新');
+}
+
 function setFilter(f,el){
   currentFilter=f;
   document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));
@@ -1412,7 +1457,7 @@ function renderTodos(){
     return 0;
   });
   list.innerHTML=filtered.map(t=>`
-    <div class="todo-item">
+    <div class="todo-item" data-id="${t.id}">
       <div class="todo-check ${t.done?'done':''}" onclick="toggleTodo(${t.id})">
         ${t.done?'<i class="ti ti-check"></i>':''}
       </div>
@@ -1426,6 +1471,7 @@ function renderTodos(){
       </div>
       <div style="display:flex;gap:4px">
         ${isMeetingTodo(t.text)?`<button class="icon-btn" onclick="generateMeetingPrep(${t.id})" title="會議準備清單" style="color:var(--purple)"><i class="ti ti-clipboard-list"></i></button>`:''}
+        <button class="icon-btn" onclick="editTodo(${t.id})" title="編輯" style="color:var(--info)"><i class="ti ti-pencil"></i></button>
         <button class="icon-btn" onclick="downloadICS(${t.id})" title="加入Outlook"><i class="ti ti-calendar-plus"></i></button>
         <button class="icon-btn del" onclick="deleteTodo(${t.id})"><i class="ti ti-trash"></i></button>
       </div>
