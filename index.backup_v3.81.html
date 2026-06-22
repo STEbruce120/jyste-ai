@@ -1,0 +1,3397 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>鈞曜科技 AI 秘書 v3.81</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+<script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mammoth@1.6.0/mammoth.browser.min.js"></script>
+<style>
+:root {
+  --bg: #eef2ff;
+  --bg2: #ffffff;
+  --bg3: #f1f5f9;
+  --border: #cbd5e1;
+  --text: #1e293b;
+  --text2: #64748b;
+  --info: #2563eb;
+  --info-bg: #dbeafe;
+  --info-border: #93c5fd;
+  --success: #16a34a;
+  --success-bg: #dcfce7;
+  --success-border: #86efac;
+  --warning: #d97706;
+  --warning-bg: #fef3c7;
+  --warning-border: #fcd34d;
+  --danger: #dc2626;
+  --danger-bg: #fee2e2;
+  --danger-border: #fca5a5;
+  --purple: #7c3aed;
+  --cyan: #0891b2;
+  --radius: 14px;
+  --radius-sm: 8px;
+  --shadow: 0 2px 10px rgba(30,41,59,0.07);
+  --shadow-md: 0 4px 20px rgba(37,99,235,0.12);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: var(--bg);
+  background-image: radial-gradient(circle at 20% 50%, rgba(37,99,235,0.06) 0%, transparent 50%),
+                    radial-gradient(circle at 80% 20%, rgba(8,145,178,0.06) 0%, transparent 50%);
+  color: var(--text);
+  min-height: 100vh;
+}
+.app { max-width: 760px; margin: 0 auto; padding: 1.25rem 1rem 4rem; }
+
+/* Header */
+.header { display: flex; align-items: center; gap: 14px; margin-bottom: 1.5rem; padding: 1.1rem 1.25rem; border-radius: var(--radius); background: linear-gradient(135deg, #1d4ed8 0%, #0891b2 100%); box-shadow: var(--shadow-md); }
+.logo { width: 44px; height: 44px; border-radius: var(--radius-sm); background: rgba(255,255,255,0.2); display: flex; align-items: center; justify-content: center; font-size: 22px; color: #fff; flex-shrink: 0; backdrop-filter: blur(4px); }
+.header-text h1 { font-size: 18px; font-weight: 700; color: #fff; }
+.header-text p { font-size: 13px; color: rgba(255,255,255,0.8); margin-top: 2px; }
+.header-right { margin-left: auto; }
+.api-status { font-size: 12px; padding: 4px 10px; border-radius: 20px; display: flex; align-items: center; gap: 5px; }
+.api-status.ok { background: rgba(255,255,255,0.2); color: #fff; border: 1px solid rgba(255,255,255,0.35); }
+.api-status.no { background: rgba(239,68,68,0.2); color: #fecaca; border: 1px solid rgba(239,68,68,0.4); }
+
+/* API Setup */
+.setup-card { background: var(--info-bg); border: 1px solid var(--info-border); border-radius: var(--radius); padding: 1.25rem; margin-bottom: 1rem; }
+.setup-card h3 { font-size: 15px; font-weight: 600; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
+.setup-card p { font-size: 13px; color: var(--text2); margin-bottom: 12px; line-height: 1.6; }
+.input-row { display: flex; gap: 8px; }
+.input-row input { flex: 1; padding: 9px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg2); color: var(--text); font-size: 14px; }
+.input-row input:focus { outline: none; border-color: var(--info); }
+
+/* Alerts */
+.notif-bar { display: none; align-items: center; gap: 10px; padding: 10px 14px; background: var(--warning-bg); border: 1px solid var(--warning-border); border-radius: var(--radius-sm); margin-bottom: 1rem; font-size: 13px; color: var(--warning); }
+.reminder-alert { background: var(--danger-bg); border: 1px solid var(--danger-border); border-radius: var(--radius-sm); padding: 12px; margin-bottom: 1rem; font-size: 13px; color: var(--danger); display: none; }
+.reminder-alert ul { margin-top: 6px; padding-left: 16px; }
+.reminder-alert li { margin-bottom: 4px; }
+
+/* Tabs */
+.tabs { display: flex; gap: 6px; margin-bottom: 1.5rem; flex-wrap: wrap; }
+.tab { flex: 1; min-width: 60px; padding: 9px 4px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg2); cursor: pointer; font-size: 12px; color: var(--text2); text-align: center; transition: all 0.2s; box-shadow: var(--shadow); }
+.tab:hover { border-color: var(--info); color: var(--info); transform: translateY(-1px); box-shadow: var(--shadow-md); }
+.tab.active { border-color: transparent; background: linear-gradient(135deg, #2563eb, #0891b2); color: #fff; font-weight: 600; box-shadow: 0 4px 14px rgba(37,99,235,0.35); }
+.tab i { display: block; font-size: 18px; margin-bottom: 3px; }
+.section { display: none; } .section.active { display: block; }
+
+/* Cards */
+.card { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem 1.25rem; margin-bottom: 1rem; box-shadow: var(--shadow); }
+.card-title { font-size: 14px; font-weight: 500; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; }
+.card-title-left { display: flex; align-items: center; gap: 8px; color: var(--text2); }
+
+/* Buttons */
+button { padding: 8px 14px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--bg2); cursor: pointer; font-size: 13px; color: var(--text); display: inline-flex; align-items: center; gap: 6px; transition: all 0.15s; }
+button:hover { background: var(--bg3); }
+button:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-primary { background: linear-gradient(135deg, #2563eb, #0891b2) !important; border-color: transparent !important; color: #fff !important; font-weight: 600; box-shadow: 0 2px 10px rgba(37,99,235,0.3); }
+.btn-primary:hover { opacity: 0.9; transform: translateY(-1px); box-shadow: 0 4px 16px rgba(37,99,235,0.4); }
+.btn-success { background: linear-gradient(135deg, #16a34a, #059669) !important; border-color: transparent !important; color: #fff !important; font-weight: 600; box-shadow: 0 2px 10px rgba(22,163,74,0.3); }
+.btn-row { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+
+/* Form inputs */
+textarea { width: 100%; min-height: 120px; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px; font-size: 14px; font-family: inherit; color: var(--text); background: var(--bg3); resize: vertical; }
+textarea:focus { outline: none; border-color: var(--info); }
+.hint-box { background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px; font-size: 13px; color: var(--text2); margin-top: 10px; line-height: 1.6; }
+.todo-input-row { display: flex; gap: 8px; margin-bottom: 10px; }
+.todo-input-row input { flex: 1; padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 14px; background: var(--bg3); color: var(--text); }
+.meta-row { display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+.meta-row input { flex: 1; min-width: 110px; padding: 7px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 13px; background: var(--bg3); color: var(--text); }
+input:focus { outline: none; border-color: var(--info) !important; }
+
+/* Morning */
+.morning-header { background: linear-gradient(135deg, #1d4ed8 0%, #0891b2 60%, #0e7490 100%); border: none; border-radius: var(--radius); padding: 1.25rem; margin-bottom: 1rem; box-shadow: var(--shadow-md); color: #fff; }
+.morning-date { font-size: 13px; color: rgba(255,255,255,0.75); }
+.morning-greeting { font-size: 22px; font-weight: 700; margin: 4px 0 10px; color: #fff; }
+.morning-stats { display: flex; gap: 16px; flex-wrap: wrap; }
+.morning-stat { font-size: 13px; color: rgba(255,255,255,0.85); display: flex; align-items: center; gap: 5px; }
+
+/* News */
+.news-item { padding: 12px 0; border-bottom: 1px solid var(--border); }
+.news-item:last-child { border-bottom: none; }
+.news-cat { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 20px; display: inline-block; margin-bottom: 6px; }
+.cat-mfg { background: rgba(245,158,11,0.15); color: var(--warning); }
+.cat-tw { background: rgba(34,197,94,0.15); color: var(--success); }
+.cat-global { background: rgba(59,130,246,0.15); color: var(--info); }
+.cat-finance { background: rgba(245,158,11,0.15); color: var(--warning); }
+.cat-tech { background: rgba(168,85,247,0.15); color: var(--purple); }
+.news-title { font-size: 14px; font-weight: 500; cursor: pointer; line-height: 1.4; }
+.news-title:hover { color: var(--info); }
+.news-summary { font-size: 13px; color: var(--text2); margin-top: 3px; line-height: 1.5; }
+.news-expand { font-size: 12px; color: var(--info); cursor: pointer; margin-top: 6px; display: inline-flex; align-items: center; gap: 4px; }
+.news-detail { font-size: 13px; color: var(--text); line-height: 1.7; margin-top: 8px; padding: 10px; background: var(--bg3); border-radius: var(--radius-sm); display: none; }
+.loading-box { text-align: center; padding: 2.5rem; color: var(--text2); }
+.spin { animation: spin 1s linear infinite; display: inline-block; }
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+@keyframes blink { 0%,80%,100%{opacity:.2} 40%{opacity:1} }
+
+/* Stats */
+.stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 1rem; }
+.stat { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px; text-align: center; box-shadow: var(--shadow); transition: transform 0.15s; }
+.stat:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+.stat-num { font-size: 22px; font-weight: 700; color: var(--info); }
+.stat-label { font-size: 11px; color: var(--text2); margin-top: 2px; }
+.stat.urgent .stat-num { color: var(--danger); }
+
+/* Todo */
+.filter-row { display: flex; gap: 6px; margin-bottom: 1rem; flex-wrap: wrap; }
+.filter-btn { padding: 5px 14px; border-radius: 20px; border: 1px solid var(--border); background: var(--bg2); font-size: 12px; color: var(--text2); cursor: pointer; transition: all 0.15s; box-shadow: var(--shadow); }
+.filter-btn:hover { border-color: var(--info); color: var(--info); }
+.filter-btn.active { background: linear-gradient(135deg, #2563eb, #0891b2); border-color: transparent; color: #fff; font-weight: 600; box-shadow: 0 2px 8px rgba(37,99,235,0.3); }
+.todo-item { display: flex; align-items: flex-start; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.todo-item:last-child { border-bottom: none; }
+.todo-check { width: 20px; height: 20px; border: 2px solid var(--border); border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 2px; background: var(--bg3); transition: all 0.15s; }
+.todo-check:hover { border-color: var(--info); background: var(--info-bg); }
+.todo-check.done { background: linear-gradient(135deg, #16a34a, #059669); border-color: transparent; color: #fff; }
+.todo-text { flex: 1; font-size: 14px; line-height: 1.5; }
+.todo-text.done { text-decoration: line-through; color: var(--text2); }
+.todo-meta { font-size: 12px; color: var(--text2); margin-top: 3px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 500; }
+.badge-pending { background: rgba(245,158,11,0.15); color: var(--warning); }
+.badge-done { background: rgba(34,197,94,0.15); color: var(--success); }
+.badge-urgent { background: rgba(239,68,68,0.15); color: var(--danger); }
+.badge-soon { background: rgba(245,158,11,0.15); color: var(--warning); }
+.badge-today { background: rgba(168,85,247,0.15); color: var(--purple); }
+.icon-btn { background: none; border: none; cursor: pointer; padding: 4px; font-size: 16px; color: var(--text2); }
+.icon-btn:hover { color: var(--text); }
+.icon-btn.del:hover { color: var(--danger); }
+
+/* History */
+.history-item { padding: 10px 0; border-bottom: 1px solid var(--border); cursor: pointer; }
+.history-item:last-child { border-bottom: none; }
+.history-item:hover .history-title { color: var(--info); }
+.history-title { font-size: 14px; font-weight: 500; }
+.history-date { font-size: 12px; color: var(--text2); margin-top: 2px; }
+.history-preview { font-size: 13px; color: var(--text2); margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.empty { text-align: center; padding: 2.5rem; color: var(--text2); font-size: 14px; }
+.empty i { font-size: 36px; display: block; margin-bottom: 10px; }
+
+/* Modal */
+.modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 100; align-items: center; justify-content: center; }
+.modal-overlay.open { display: flex; }
+.modal { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.5rem; width: 92%; max-width: 580px; max-height: 82vh; overflow-y: auto; box-shadow: 0 8px 40px rgba(30,41,59,0.15); }
+.modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+.modal-title { font-size: 15px; font-weight: 600; }
+
+/* Toast */
+.toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: linear-gradient(135deg, #16a34a, #059669); border: none; color: #fff; padding: 10px 22px; border-radius: 30px; font-size: 14px; font-weight: 600; display: none; z-index: 200; white-space: nowrap; box-shadow: 0 4px 20px rgba(22,163,74,0.4); }
+
+/* Schedule */
+.sch-item{display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:0.5px solid var(--border)}
+.sch-item:last-child{border-bottom:none}
+.sch-time{font-size:13px;font-weight:500;color:var(--info);min-width:90px;flex-shrink:0}
+.sch-content{flex:1}
+.sch-title{font-size:14px;font-weight:500;color:var(--text)}
+.sch-meta{font-size:12px;color:var(--text2);margin-top:3px;display:flex;gap:8px;flex-wrap:wrap}
+.sch-delete{background:none;border:none;cursor:pointer;padding:4px;font-size:16px;color:var(--text2)}
+.sch-delete:hover{color:var(--danger)}
+.sch-day-label{font-size:12px;font-weight:500;color:var(--text2);padding:6px 0 4px;border-bottom:0.5px solid var(--border);margin-bottom:4px}
+
+/* 會議參考文件 */
+.doc-drop-zone { border: 2px dashed var(--border); border-radius: var(--radius-sm); padding: 20px; text-align: center; cursor: pointer; color: var(--text2); font-size: 13px; transition: all 0.2s; }
+.doc-drop-zone:hover, .doc-drop-zone.dragover { border-color: var(--info); background: var(--info-bg); color: var(--info); }
+.doc-drop-zone i { font-size: 28px; display: block; margin-bottom: 6px; }
+.doc-item { display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: var(--bg3); border-radius: var(--radius-sm); margin-top: 8px; font-size: 13px; }
+.doc-item i { color: var(--info); flex-shrink: 0; }
+.doc-item-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.doc-item-size { font-size: 11px; color: var(--text2); flex-shrink: 0; }
+.doc-item-del { background: none; border: none; cursor: pointer; color: var(--text2); padding: 2px 4px; font-size: 15px; }
+.doc-item-del:hover { color: var(--danger); }
+.doc-loading { font-size: 12px; color: var(--info); display: flex; align-items: center; gap: 6px; margin-top: 6px; }
+
+/* Result */
+.result-box { margin-top: 1rem; background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 1rem; font-size: 14px; line-height: 1.8; white-space: pre-wrap; display: none; }
+
+/* Recording */
+.rec-area { display: flex; align-items: center; gap: 14px; padding: 14px; background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius-sm); margin-bottom: 12px; }
+.rec-btn { width: 52px; height: 52px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 24px; flex-shrink: 0; border: none; transition: all 0.2s; }
+.rec-btn.idle { background: var(--danger-bg); color: var(--danger); border: 1px solid var(--danger-border); }
+.rec-btn.idle:hover { opacity: 0.85; }
+.rec-btn.recording { background: var(--danger); color: #fff; animation: pulse 1s ease-in-out infinite; }
+@keyframes pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.08)} }
+.rec-info { flex: 1; }
+.rec-status { font-size: 14px; font-weight: 500; color: var(--text); }
+.rec-timer { font-size: 24px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--danger); margin-top: 2px; display: none; }
+.rec-hint { font-size: 12px; color: var(--text2); margin-top: 3px; }
+.divider { display: flex; align-items: center; gap: 8px; margin: 12px 0; color: var(--text2); font-size: 12px; }
+.divider::before,.divider::after { content:''; flex:1; height:1px; background:var(--border); }
+
+/* ── 快速指令輸入框 ── */
+.cmd-bar{display:flex;gap:8px;padding:12px 14px;background:linear-gradient(135deg,#dbeafe,#e0f2fe);border:1px solid #93c5fd;border-radius:var(--radius);margin-bottom:1rem;align-items:center;box-shadow:var(--shadow)}
+.cmd-input-wrap{flex:1;position:relative}
+.cmd-input-wrap i{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--text2);font-size:16px;pointer-events:none}
+.cmd-input{width:100%;padding:9px 12px 9px 38px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg);color:var(--text);font-size:14px}
+.cmd-input:focus{outline:none;border-color:var(--info)}
+.cmd-result{font-size:13px;padding:8px 12px;background:var(--success-bg);border:1px solid var(--success-border);color:var(--success);border-radius:var(--radius-sm);margin-bottom:10px;display:none;line-height:1.6}
+.cmd-result.warn{background:var(--warning-bg);border-color:var(--warning-border);color:var(--warning)}
+/* ── 智慧對話浮動 ── */
+.chat-fab{position:fixed;bottom:24px;right:24px;width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,#2563eb,#0891b2);border:none;cursor:pointer;font-size:22px;color:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 20px rgba(37,99,235,0.45);z-index:90;transition:all 0.2s;padding:0}
+.chat-fab:hover{transform:scale(1.08)}
+.chat-panel{position:fixed;bottom:88px;right:20px;width:320px;max-width:calc(100vw - 40px);background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 8px 32px rgba(0,0,0,0.5);z-index:90;display:none;flex-direction:column}
+.chat-panel.open{display:flex}
+.chat-header{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--border)}
+.chat-title{font-size:14px;font-weight:500;display:flex;align-items:center;gap:8px}
+.chat-msgs{min-height:180px;max-height:260px;overflow-y:auto;padding:10px;display:flex;flex-direction:column;gap:8px}
+.chat-msg{max-width:88%;padding:8px 12px;border-radius:10px;font-size:13px;line-height:1.6;white-space:pre-wrap}
+.chat-msg.ai{background:var(--bg3);color:var(--text);align-self:flex-start}
+.chat-msg.user{background:var(--info-bg);color:#93c5fd;align-self:flex-end;border:1px solid var(--info-border)}
+.chat-input-row{display:flex;gap:8px;padding:10px;border-top:1px solid var(--border)}
+.chat-text-input{flex:1;padding:7px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg3);color:var(--text);font-size:13px}
+.chat-text-input:focus{outline:none;border-color:var(--info)}
+/* ── 每日工作回顧 ── */
+.review-result{font-size:13px;line-height:1.9;white-space:pre-wrap;color:var(--text);margin-top:12px;padding:14px;background:linear-gradient(135deg,#f5f3ff,#ede9fe);border-radius:var(--radius-sm);border-left:4px solid var(--purple);display:none;box-shadow:var(--shadow)}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="logo"><i class="ti ti-robot"></i></div>
+    <div class="header-text">
+      <h1>鈞曜科技 AI 秘書</h1>
+      <p>會議記錄 ・ 待辦追蹤 ・ 每日晨報 ・ Outlook &nbsp;<span style="font-size:11px;background:#22c55e22;color:#22c55e;border:1px solid #22c55e44;border-radius:20px;padding:1px 8px;vertical-align:middle">v3.81</span></p>
+    </div>
+    <div class="header-right" style="display:flex;gap:8px;align-items:center">
+      <div class="api-status ok" id="api-status"><i class="ti ti-check"></i> AI 已連線</div>
+      <button id="voice-ctrl-btn" onclick="toggleVoiceControl()" title="語音控制 說刀疤喚醒" style="padding:6px 12px;font-size:13px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--text2);display:inline-flex;align-items:center;gap:6px;cursor:pointer">
+        <i class="ti ti-microphone" id="voice-ctrl-icon"></i> 語音控制
+      </button>
+      <button onclick="changeApiKey()" style="padding:4px 10px;font-size:12px;color:var(--text2)"><i class="ti ti-refresh"></i> 更換Key</button>
+    </div>
+  </div>
+
+  <!-- ② 快速指令輸入框 -->
+  <!-- 對話記錄區 -->
+  <div id="cmd-chat" style="display:none;flex-direction:column;gap:8px;margin-bottom:10px;max-height:320px;overflow-y:auto;padding:10px 12px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);"></div>
+
+  <div class="cmd-bar">
+    <div class="cmd-input-wrap">
+      <i class="ti ti-terminal"></i>
+      <input class="cmd-input" type="text" id="cmd-input"
+             placeholder="直接輸入指令... 例如：新增明天跟客戶開會、今天最重要的事是什麼"
+             onkeydown="if(event.key==='Enter')processQuickCmd()"/>
+    </div>
+    <button class="btn-primary" onclick="processQuickCmd()" id="cmd-btn" style="white-space:nowrap;flex-shrink:0">
+      <i class="ti ti-sparkles"></i> AI執行
+    </button>
+    <button id="cmd-clear-btn" onclick="clearCmdChat()" title="結束話題" style="display:none;background:var(--bg3);border:1px solid var(--border);color:var(--text2);padding:0 12px;border-radius:var(--radius-sm);cursor:pointer;white-space:nowrap;flex-shrink:0;font-size:13px;">
+      <i class="ti ti-x"></i> 結束話題
+    </button>
+  </div>
+  <div id="cmd-result" class="cmd-result"></div>
+
+  <!-- API Key 設定 -->
+  <div class="setup-card" id="setup-card" style="display:none">
+    <h3><i class="ti ti-key"></i> 設定 Groq API Key</h3>
+    <p>請將您複製的 Groq API Key 貼入下方（格式：gsk_...），即可啟用所有 AI 功能。完全免費！</p>
+    <div class="input-row">
+      <input type="password" id="api-key-input" placeholder="貼上您的 Groq API Key（格式：gsk_...）" />
+      <button class="btn-primary" onclick="saveApiKey()"><i class="ti ti-check"></i> 儲存</button>
+    </div>
+  </div>
+
+  <!-- 通知 -->
+  <div class="notif-bar" id="notif-bar">
+    <i class="ti ti-bell"></i>
+    <span style="flex:1">開啟瀏覽器通知，即使沒有打開系統也能收到到期提醒</span>
+    <button onclick="requestNotif()" style="background:var(--warning);color:#000;border:none;padding:4px 12px;font-size:12px;">開啟通知</button>
+  </div>
+
+  <!-- 語音控制狀態列 -->
+  <div id="voice-ctrl-bar" style="display:none;align-items:center;gap:10px;padding:10px 14px;background:#1a2a3a;border:1px solid #3b82f6;border-radius:8px;margin-bottom:1rem;font-size:13px;color:#93c5fd">
+    <i class="ti ti-microphone" style="font-size:16px;color:#3b82f6"></i>
+    <span id="voice-ctrl-status" style="flex:1">語音控制已開啟，說「刀疤」喚醒我</span>
+    <span id="voice-ctrl-result" style="color:#e8eaf0;font-weight:500"></span>
+  </div>
+
+  <!-- 到期警示 -->
+  <div class="reminder-alert" id="reminder-alert">
+    <strong><i class="ti ti-alert-circle"></i> 到期提醒</strong>
+    <ul id="reminder-list"></ul>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab('morning')"><i class="ti ti-sun"></i>每日晨報</div>
+    <div class="tab" onclick="switchTab('meeting')"><i class="ti ti-file-text"></i>會議記錄</div>
+    <div class="tab" onclick="switchTab('todo')"><i class="ti ti-checkbox"></i>待辦事項</div>
+    <div class="tab" onclick="switchTab('idea')"><i class="ti ti-bulb"></i>創意捕捉</div>
+  </div>
+
+  <!-- 每日晨報 -->
+  <div id="tab-morning" class="section active">
+    <div class="morning-header">
+      <div class="morning-date" id="morning-date"></div>
+      <div class="morning-greeting" id="morning-greeting"></div>
+      <div class="morning-stats" id="morning-stats"></div>
+    </div>
+
+    <!-- 語音播報 -->
+    <div class="card" style="background:linear-gradient(135deg,#1a3a2a,var(--bg2));border-color:#22c55e33;margin-bottom:1rem">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+        <div>
+          <div style="font-size:14px;font-weight:500;color:var(--text);display:flex;align-items:center;gap:8px">
+            <i class="ti ti-volume" style="color:#22c55e"></i> 每日簡報語音播報
+          </div>
+          <div style="font-size:12px;color:var(--text2);margin-top:3px">AI 秘書為您朗讀今日重點摘要</div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <select id="voice-speed" style="padding:6px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px">
+            <option value="0.8">慢速</option>
+            <option value="1">正常</option>
+            <option value="1.3" selected>快速</option>
+          </select>
+          <button id="speak-btn" onclick="toggleSpeak()" style="padding:8px 16px;background:#22c55e;border:none;border-radius:8px;color:#000;font-weight:500;cursor:pointer;font-size:14px;display:inline-flex;align-items:center;gap:6px">
+            <i class="ti ti-player-play" id="speak-icon"></i> 播報
+          </button>
+          <button onclick="stopSpeak()" style="padding:8px 12px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--text2);cursor:pointer;font-size:14px" title="停止">
+            <i class="ti ti-player-stop"></i>
+          </button>
+        </div>
+      </div>
+      <div id="speak-text" style="margin-top:10px;font-size:13px;color:var(--text2);line-height:1.7;display:none;padding:10px;background:var(--bg3);border-radius:6px;border-left:3px solid #22c55e"></div>
+    </div>
+
+    <!-- 天氣查詢 -->
+    <div class="card" style="margin-bottom:1rem">
+      <div class="card-title">
+        <div class="card-title-left"><i class="ti ti-cloud-sun"></i> 即時天氣</div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input id="weather-city" type="text" placeholder="城市（留空自動定位）"
+            style="padding:5px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;width:160px"
+            onkeydown="if(event.key==='Enter')loadWeather(this.value.trim(),0)">
+          <button class="btn-primary" onclick="loadWeather(document.getElementById('weather-city').value.trim(),0)">
+            <i class="ti ti-refresh"></i> 查詢
+          </button>
+        </div>
+      </div>
+      <div id="weather-container">
+        <div class="empty"><i class="ti ti-cloud"></i>點擊查詢或說「今天天氣」</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">
+        <div class="card-title-left"><i class="ti ti-news"></i> 今日新聞摘要</div>
+        <button class="btn-primary" onclick="loadNews()" id="news-btn"><i class="ti ti-refresh"></i> 載入今日新聞</button>
+      </div>
+      <div id="news-container">
+        <div class="empty"><i class="ti ti-news"></i>點擊「載入今日新聞」取得最新資訊</div>
+      </div>
+    </div>
+
+    <!-- ③ 每日工作回顧 -->
+    <div class="card">
+      <div class="card-title">
+        <div class="card-title-left"><i class="ti ti-chart-bar" style="color:var(--purple)"></i> 今日工作回顧</div>
+        <button class="btn-primary" onclick="generateWorkReview()" id="review-btn">
+          <i class="ti ti-sparkles"></i> AI 生成回顧
+        </button>
+      </div>
+      <div style="font-size:13px;color:var(--text2);line-height:1.6">AI 秘書分析今天工作進度，告訴你完成了什麼、明天該優先做什麼</div>
+      <div id="review-loading" class="loading-box" style="display:none">
+        <i class="ti ti-loader-2 spin" style="font-size:24px;display:block;margin-bottom:8px"></i>AI 分析中...
+      </div>
+      <div id="review-result" class="review-result"></div>
+    </div>
+  </div>
+
+  <!-- 會議記錄 -->
+  <div id="tab-meeting" class="section">
+
+    <!-- 會議參考文件上傳 -->
+    <div class="card">
+      <div class="card-title">
+        <div class="card-title-left"><i class="ti ti-file-upload" style="color:var(--purple)"></i> 會議參考文件</div>
+        <span style="font-size:12px;color:var(--text2)">選填 · AI 整理時自動參考</span>
+      </div>
+      <div class="doc-drop-zone" id="doc-drop-zone"
+           onclick="document.getElementById('meeting-doc-input').click()"
+           ondragover="event.preventDefault();this.classList.add('dragover')"
+           ondragleave="this.classList.remove('dragover')"
+           ondrop="handleDocDrop(event)">
+        <i class="ti ti-upload"></i>
+        點擊或拖曳上傳文件（PDF、Word、TXT）
+        <div style="font-size:11px;margin-top:4px">AI 整理會議記錄時會自動參考這些文件內容</div>
+      </div>
+      <input type="file" id="meeting-doc-input" multiple accept=".pdf,.txt,.md,.docx,.doc"
+             style="display:none" onchange="handleMeetingDocUpload(this.files)">
+      <div id="meeting-docs-list"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><div class="card-title-left"><i class="ti ti-microphone"></i> 即時錄音</div></div>
+      <div class="rec-area">
+        <button class="rec-btn idle" id="rec-btn" onclick="toggleRecord()">
+          <i class="ti ti-microphone" id="rec-icon"></i>
+        </button>
+        <div class="rec-info">
+          <div class="rec-status" id="rec-status">點擊開始錄音</div>
+          <div class="rec-timer" id="rec-timer">00:00</div>
+          <div class="rec-hint" id="rec-hint">錄音結束後，語音會自動轉成文字填入下方</div>
+        </div>
+      </div>
+      <div class="divider">或直接輸入文字</div>
+    </div>
+    <div class="card">
+      <div class="card-title"><div class="card-title-left"><i class="ti ti-edit"></i> 會議內容</div></div>
+      <textarea id="meeting-input" placeholder="把會議重點輸入在這裡，或使用上方錄音功能...
+
+例如：今天跟客戶開會，討論垂直式自動倉儲報價，客戶希望下個月完成安裝，需要確認交期、備料清單、安裝人員..."></textarea>
+      <div class="btn-row">
+        <button class="btn-primary" onclick="processMeeting()"><i class="ti ti-sparkles"></i> AI 整理會議記錄</button>
+        <button onclick="document.getElementById('meeting-input').value=''"><i class="ti ti-trash"></i> 清除</button>
+      </div>
+      <div class="loading-box" id="meeting-loading" style="display:none">
+        <i class="ti ti-loader-2 spin" style="font-size:28px;display:block;margin-bottom:8px"></i>AI 秘書整理中...
+      </div>
+      <div class="result-box" id="meeting-result"></div>
+      <div id="import-row" style="display:none;margin-top:10px">
+        <button class="btn-success" onclick="importTodos()"><i class="ti ti-download"></i> 將待辦事項匯入追蹤清單</button>
+      </div>
+    </div>
+
+    <!-- 歷史記錄（移入會議記錄頁） -->
+    <div class="card">
+      <div class="card-title">
+        <div class="card-title-left"><i class="ti ti-clock"></i> 歷史會議記錄</div>
+      </div>
+      <div id="history-list"></div>
+    </div>
+  </div>
+
+  <!-- 待辦事項 -->
+  <div id="tab-todo" class="section">
+    <div class="stats">
+      <div class="stat"><div class="stat-num" id="stat-total">0</div><div class="stat-label">全部</div></div>
+      <div class="stat"><div class="stat-num" id="stat-pending">0</div><div class="stat-label">待處理</div></div>
+      <div class="stat"><div class="stat-num" id="stat-done">0</div><div class="stat-label">已完成</div></div>
+      <div class="stat urgent"><div class="stat-num" id="stat-urgent">0</div><div class="stat-label">⚠️ 即將到期</div></div>
+    </div>
+    <div class="card">
+      <div class="card-title"><div class="card-title-left"><i class="ti ti-plus"></i> 新增待辦事項</div></div>
+      <div class="todo-input-row">
+        <input type="text" id="todo-input" placeholder="輸入待辦事項..." onkeydown="if(event.key==='Enter')addTodo()" />
+        <button class="btn-primary" onclick="addTodo()">新增</button>
+      </div>
+      <div class="meta-row">
+        <input type="text" id="todo-person" placeholder="負責人（選填）" />
+        <input type="date" id="todo-date" />
+        <input type="time" id="todo-time" />
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;font-size:13px">
+        <input type="checkbox" id="add-to-cal" style="width:16px;height:16px;cursor:pointer" />
+        <label for="add-to-cal" style="cursor:pointer;color:var(--text)">
+          <i class="ti ti-calendar-plus" style="color:var(--info)"></i> 同時產生 Outlook 行事曆檔案（.ics）
+        </label>
+      </div>
+    </div>
+    <div class="card">
+      <div class="filter-row">
+        <div class="filter-btn active" onclick="setFilter('all',this)">全部</div>
+        <div class="filter-btn" onclick="setFilter('pending',this)">待處理</div>
+        <div class="filter-btn" onclick="setFilter('urgent',this)">⚠️ 即將到期</div>
+        <div class="filter-btn" onclick="setFilter('done',this)">已完成</div>
+      </div>
+      <div id="todo-list"></div>
+    </div>
+  </div>
+
+  <!-- 創意捕捉 Tab -->
+  <div id="tab-idea" class="section">
+    <div class="card">
+      <div class="card-title">
+        <div class="card-title-left"><i class="ti ti-messages" style="color:#f59e0b"></i> 創意討論室</div>
+        <span style="font-size:11px;color:var(--text2)">和刀疤一起討論，讓想法更完整</span>
+      </div>
+
+      <!-- 狀態列 -->
+      <div id="idea-status" style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:9px 14px;margin-bottom:10px;font-size:13px;color:var(--text2);display:flex;align-items:center;gap:8px">
+        <i class="ti ti-bulb" style="color:#f59e0b"></i>
+        <span id="idea-status-text">說出你的想法，刀疤會提出看法和問題，一起把想法變具體</span>
+      </div>
+
+      <!-- 對話泡泡區 -->
+      <div id="idea-chat-area" style="height:340px;overflow-y:auto;background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:10px;display:flex;flex-direction:column;gap:10px">
+        <div class="idea-empty-state" style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:var(--text2);font-size:13px;gap:10px">
+          <i class="ti ti-bulb" style="font-size:32px;color:#f59e0b"></i>
+          <div style="text-align:center;line-height:1.8">
+            輸入你的想法，刀疤會：<br>
+            ① 給你看法和意見　② 上網查相關資料　③ 問關鍵問題
+          </div>
+        </div>
+      </div>
+
+      <!-- 輸入列 -->
+      <div style="display:flex;gap:8px;margin-bottom:10px">
+        <input id="idea-chat-input" type="text" placeholder="輸入想法或回應刀疤的問題... (Enter 送出)"
+          onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendIdeaMessage();}"
+          style="flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px 14px;color:var(--text);font-size:14px">
+        <button onclick="sendIdeaMessage()" style="padding:10px 16px;background:#f59e0b;color:#000;border:none;border-radius:8px;font-size:14px;cursor:pointer" title="送出">
+          <i class="ti ti-send"></i>
+        </button>
+        <button onclick="clearIdea()" style="padding:10px 12px;background:var(--bg3);border:1px solid var(--border);color:var(--text2);border-radius:8px;font-size:13px;cursor:pointer" title="清除重來">
+          <i class="ti ti-trash"></i>
+        </button>
+      </div>
+
+      <!-- 整理 & 下載區（討論2輪後出現） -->
+      <div id="idea-finalize-area" style="display:none;border-top:1px solid var(--border);padding-top:12px">
+        <!-- 整理按鈕 -->
+        <div id="idea-finalize-btn-wrap" style="margin-bottom:10px">
+          <button onclick="finalizeIdea()" style="width:100%;padding:11px;background:linear-gradient(135deg,#f59e0b,#d97706);color:#000;border:none;border-radius:8px;font-size:14px;font-weight:bold;cursor:pointer">
+            <i class="ti ti-sparkles"></i> 整理成簡報大綱
+          </button>
+        </div>
+        <!-- 下載區（整理後出現） -->
+        <div id="idea-ready-section" style="display:none">
+          <div style="font-size:12px;color:var(--text2);margin-bottom:8px"><i class="ti ti-palette"></i> 選擇簡報風格</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+            <button id="theme-btn-dark" onclick="setIdeaTheme('dark')" style="padding:7px 13px;background:#1C2B5E;color:#C7D7FE;border:2px solid #4B7BF5;border-radius:8px;font-size:13px;cursor:pointer">🌑 專業深色</button>
+            <button id="theme-btn-light" onclick="setIdeaTheme('light')" style="padding:7px 13px;background:#fff;color:#2563EB;border:2px solid #d1d5db;border-radius:8px;font-size:13px;cursor:pointer">☀️ 現代簡潔</button>
+            <button id="theme-btn-vivid" onclick="setIdeaTheme('vivid')" style="padding:7px 13px;background:#7C3AED;color:#FDE68A;border:2px solid #d1d5db;border-radius:8px;font-size:13px;cursor:pointer">🎨 活潑鮮豔</button>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button onclick="downloadIdeaPPTX()" style="padding:10px 18px;background:#22c55e;color:#fff;border:none;border-radius:8px;font-size:14px;cursor:pointer;display:flex;align-items:center;gap:6px">
+              <i class="ti ti-presentation"></i> 下載簡報（PPTX）
+            </button>
+            <button onclick="copyForGamma()" style="padding:10px 18px;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;border:none;border-radius:8px;font-size:14px;cursor:pointer;display:flex;align-items:center;gap:6px">
+              <i class="ti ti-copy"></i> 複製大綱給 Gamma
+            </button>
+          </div>
+          <div id="gamma-hint" style="display:none;margin-top:10px;background:#1e1b4b;border:1px solid #6366f1;border-radius:8px;padding:12px 14px;font-size:13px;color:#c7d2fe;line-height:1.8">
+            <div style="font-weight:bold;margin-bottom:6px;color:#a5b4fc">✅ 大綱已複製！接下來：</div>
+            <div>1. 開啟 Gamma.app　2. 點「貼上文字」　3. Ctrl+V 貼上 → Generate</div>
+            <a href="https://gamma.app" target="_blank" style="display:inline-block;margin-top:8px;padding:7px 16px;background:#6366f1;color:#fff;border-radius:6px;text-decoration:none;font-size:13px">
+              <i class="ti ti-external-link"></i> 開啟 Gamma.app
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal -->
+<div class="modal-overlay" id="history-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="modal-title"></div>
+      <button class="icon-btn" onclick="closeModal()"><i class="ti ti-x"></i></button>
+    </div>
+    <div id="modal-ref-docs" style="display:none;align-items:center;gap:6px;font-size:12px;color:var(--purple);background:rgba(124,58,237,0.08);padding:7px 12px;border-radius:var(--radius-sm);margin-bottom:10px;flex-wrap:wrap"></div>
+      <div id="modal-body" style="font-size:14px;line-height:1.8;white-space:pre-wrap"></div>
+  </div>
+</div>
+
+<!-- ④ 智慧對話浮動按鈕 -->
+<button class="chat-fab" onclick="toggleChat()" title="刀疤 AI 助理">
+  <i class="ti ti-message-chatbot" id="chat-fab-icon"></i>
+</button>
+<div class="chat-panel" id="chat-panel">
+  <div class="chat-header">
+    <div class="chat-title"><i class="ti ti-robot" style="color:var(--info)"></i> 刀疤 AI 助理</div>
+    <button class="icon-btn" onclick="toggleChat()"><i class="ti ti-x"></i></button>
+  </div>
+  <div class="chat-msgs" id="chat-msgs">
+    <div class="chat-msg ai">bruce哥好！我是刀疤 😊 有任何問題都可以問我，例如「今天最重要的事是什麼」、「這週進度如何」</div>
+  </div>
+  <div class="chat-input-row">
+    <input class="chat-text-input" type="text" id="chat-text-input"
+           placeholder="問刀疤任何問題..." onkeydown="if(event.key==='Enter')sendChat()"/>
+    <button class="btn-primary" onclick="sendChat()" style="padding:7px 12px;flex-shrink:0">
+      <i class="ti ti-send"></i>
+    </button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── 工具函數 ─────────────────────────────────────────────────
+function showToast(msg, duration){
+  duration = duration||3000;
+  const el=document.getElementById('toast');
+  if(!el) return;
+  el.textContent=msg;
+  el.style.opacity='1';
+  el.style.transform='translateX(-50%) translateY(0)';
+  if(el._timer) clearTimeout(el._timer);
+  el._timer=setTimeout(()=>{el.style.opacity='0';},duration);
+}
+
+function preprocessTTS(text){
+  return (text||'')
+    .replace(/％/g,'百分之').replace(/%/g,'百分之')
+    .replace(/\$(\d+)/g,'$1美元').replace(/NT\$(\d+)/g,'新台幣$1元')
+    .replace(/(\d+)°C/g,'$1度').replace(/km\/h/g,'公里每小時')
+    .replace(/https?:\/\/\S+/g,'').replace(/[*#\[\]_~`]/g,'')
+    .replace(/\n+/g,'。').trim();
+}
+
+function setupRecognitionHandlers(){
+  voiceCtrlRecognition.onresult=(e)=>{
+    if(voiceCooldown) return;
+    const result=e.results[e.results.length-1];
+    if(!result.isFinal) return;
+    const cmd=result[0].transcript.trim();
+    if(!cmd) return;
+    document.getElementById('voice-ctrl-result').textContent='聽到：'+cmd;
+
+    // 等待確認/取消時，即使 TTS 播放中也允許中斷並立即執行
+    if(voicePendingConfirm){
+      const confirmWords=['確認','對','沒錯','是的','好','OK','ok','取消','算了','不要','不用了','不對'];
+      if(confirmWords.some(w=>cmd.includes(w))){
+        if(isTTSSpeaking){
+          // 同時停止 ElevenLabs 音頻和 Chrome TTS
+          if(_currentTTSAudio){ _currentTTSAudio.pause(); _currentTTSAudio=null; }
+          window.speechSynthesis.cancel();
+          isTTSSpeaking=false;
+          _feedbackGen++; // 讓舊的 speakFeedback onend 失效
+        }
+        isProcessing=true;
+        executeVoiceCommand(cmd);
+        return;
+      }
+    }
+
+    if(isTTSSpeaking) return;
+
+    if(!isAwake){
+      if(cmd.includes('刀疤')||cmd.includes('到吧')||cmd.includes('倒吧')){
+        setAwakeMode(true);
+        isProcessing=true;
+        const greets=['我在 bruce哥 請說','在的 bruce哥 有什麼事','隨時候命 bruce哥'];
+        speakFeedback(greets[Math.floor(Math.random()*greets.length)]);
+      }
+      return;
+    }
+
+    if(isProcessing) return;
+    isProcessing=true;
+    executeVoiceCommand(cmd);
+  };
+
+  voiceCtrlRecognition.onerror=(e)=>{
+    if(e.error==='no-speech'||e.error==='aborted') return;
+    if(e.error==='not-allowed'){
+      showToast('麥克風權限被拒絕，請在瀏覽器設定允許麥克風');
+      stopVoiceControl();
+    }
+  };
+
+  voiceCtrlRecognition.onend=()=>{
+    if(!voiceCtrlActive) return;
+    if(isTTSSpeaking){
+      // TTS 播放中，先不搶音訊資源，等 TTS 結束時的 _restartMic() 負責重啟
+      return;
+    }
+    setTimeout(()=>_restartMic(), 300);
+  };
+}
+
+// Supabase 雲端資料庫設定
+const SUPABASE_URL='https://gagirkenunehrblaqwnj.supabase.co';
+const SUPABASE_KEY=localStorage.getItem('jyste_sb_key')||'sb_publishable_6HBHrc6e-43wcCCAUnN2rA_c03VkCcj';
+
+// Supabase 操作函數
+async function sbGet(table){
+  const res=await fetch(`${SUPABASE_URL}/rest/v1/${table}?user_id=eq.bruce&order=id.asc`,{
+    headers:{'apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY}
+  });
+  return res.ok?await res.json():[];
+}
+
+async function sbInsert(table,data){
+  const res=await fetch(`${SUPABASE_URL}/rest/v1/${table}`,{
+    method:'POST',
+    headers:{'apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+    body:JSON.stringify({...data,user_id:'bruce'})
+  });
+  return res.ok;
+}
+
+async function sbUpdate(table,id,data){
+  const res=await fetch(`${SUPABASE_URL}/rest/v1/${table}?id=eq.${id}`,{
+    method:'PATCH',
+    headers:{'apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY,'Content-Type':'application/json'},
+    body:JSON.stringify(data)
+  });
+  return res.ok;
+}
+
+async function sbDelete(table,id){
+  const res=await fetch(`${SUPABASE_URL}/rest/v1/${table}?id=eq.${id}`,{
+    method:'DELETE',
+    headers:{'apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY}
+  });
+  return res.ok;
+}
+
+let todos=[], meetings=[], currentFilter='all', lastExtractedTodos=[], apiKey=localStorage.getItem('jyste_groq_key')||'';
+let _voiceNewsItems=[];  // 儲存最近載入的新聞，供語音分析使用
+let _meetingDocs=[];   // 會議前上傳的參考文件 [{name,content}]
+let _lastSpokenText='';  // 記住最後一句話，供「重複」指令使用
+let _completedToday=[];  // 本次開啟後完成的待辦，供晚間簡報使用
+let isTTSSpeaking=false; // TTS 播報期間為 true，防止辨識在段落空隙誤收自己的聲音
+let _isTTSSpeakingSetAt=0;      // 記錄 isTTSSpeaking 設為 true 的時間，供看門狗偵測卡死
+let _chainTookOver=false; // speakChain 主動取消 speakFeedback 時設為 true，避免 onerror 干擾
+let _speakChainKeepAlive=null; // speakChain 的保活計時器（全域，避免舊的殘留）
+let _ttsEngineKeepAlive=null;  // Chrome TTS 引擎保活計時器
+let _voiceWatchdog=null;        // 全域看門狗 setInterval ID
+let _feedbackGen=0;             // 每次 speakFeedback 啟動時遞增
+let _speakChainGen=0;           // 每次 speakChain 呼叫遞增
+let _elevenFailCount=0;
+let _lastElevenStatus=0;       // 最近一次 ElevenLabs HTTP 狀態碼         // ElevenLabs 連續失敗次數
+let _elevenDisabledUntil=0;     // 暫停使用 ElevenLabs 的截止時間戳（毫秒）
+// ── 創意討論室 ──
+let _ideaChatHistory=[];  // 對話歷史 [{role:'user'|'assistant',content:'...'}]
+let _ideaExchangeCount=0; // 來回次數（user 說一次+1）
+let _ideaSlides=null;     // 整理後的結構化簡報資料
+let _ideaTheme='dark';    // 簡報風格：dark|light|vivid
+let _ideaListening=false; // true = 下一句語音直接送進討論室
+let _ideaSending=false;   // true = sendIdeaMessage 處理中，防止重複呼叫
+const STORAGE_KEY_TODOS='jyste_todos_v3', STORAGE_KEY_MEETINGS='jyste_meetings_v3', STORAGE_KEY_API='jyste_groq_key';
+const weekdays=['日','一','二','三','四','五','六'];
+
+async function testAPI(){
+  document.getElementById('test-result').textContent='測試中...';
+  try{
+    const res=await fetch('https://api.groq.com/openai/v1/chat/completions',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+apiKey},
+      body:JSON.stringify({model:'llama-3.3-70b-versatile',messages:[{role:'user',content:'說你好'}],max_tokens:20})
+    });
+    const data=await res.json();
+    if(data.choices){
+      document.getElementById('test-result').innerHTML='<span style="color:#22c55e">✅ 連線成功！AI 回覆：'+data.choices[0].message.content+'</span>';
+    }else{
+      document.getElementById('test-result').innerHTML='<span style="color:#ef4444">❌ 錯誤：'+JSON.stringify(data.error)+'</span>';
+    }
+  }catch(e){
+    document.getElementById('test-result').innerHTML='<span style="color:#ef4444">❌ 連線失敗：'+e.message+'</span>';
+  }
+}
+
+// ── Init ──────────────────────────────────────────
+async function init(){
+  // API Key 已內建，無需手動設定
+  apiKey=localStorage.getItem('jyste_groq_key')||'';
+  try{localStorage.setItem(STORAGE_KEY_API,apiKey);}catch(e){}
+  // 第一步：先從本機讀取（快速，無需網路）
+  try{
+    todos=JSON.parse(localStorage.getItem(STORAGE_KEY_TODOS)||'[]');
+    meetings=JSON.parse(localStorage.getItem(STORAGE_KEY_MEETINGS)||'[]');
+  }catch(e){todos=[];meetings=[];}
+  // 第二步：嘗試從 Supabase 合併（Supabase 有的以雲端為準，本機獨有的保留）
+  try{
+    const [t,m]=await Promise.all([sbGet('todos'),sbGet('meetings')]);
+    const sbTodos=t||[], sbMeetings=m||[];
+    const tm=new Map(todos.map(x=>[String(x.id),x]));
+    sbTodos.forEach(x=>tm.set(String(x.id),x));
+    todos=[...tm.values()];
+    const mm=new Map(meetings.map(x=>[String(x.id),x]));
+    sbMeetings.forEach(x=>mm.set(String(x.id),x));
+    meetings=[...mm.values()];
+    // 合併後存回本機，確保下次離線時資料完整
+    try{localStorage.setItem(STORAGE_KEY_TODOS,JSON.stringify(todos));
+        localStorage.setItem(STORAGE_KEY_MEETINGS,JSON.stringify(meetings));}catch(e){}
+  }catch(e){
+    // Supabase 連線失敗，繼續使用本機資料（已在第一步載入）
+  }
+  updateApiStatus();
+  checkNotifPermission();
+  checkReminders();
+  renderTodos();
+  renderHistory();
+  initMorning();
+  updateMorningStats();
+  // 頁面載入 2 秒後預熱 Chrome TTS 引擎，消除 ElevenLabs 失敗時的冷啟動延遲
+  setTimeout(_warmupChromeTTS, 2000);
+}
+
+function changeApiKey(){
+  document.getElementById('setup-card').style.display='block';
+  document.getElementById('api-key-input').value='';
+  document.getElementById('api-key-input').focus();
+  window.scrollTo(0,0);
+  showToast('請輸入新的 API Key');
+}
+
+function saveApiKey(){
+  const val=document.getElementById('api-key-input').value.trim();
+  if(!val){showToast('請輸入 API Key');return;}
+  if(!val.startsWith('gsk_')){
+    showToast('⚠️ 格式不對！Groq Key 應該以 gsk_ 開頭');
+    return;
+  }
+  apiKey=val;
+  try{
+    localStorage.setItem(STORAGE_KEY_API,apiKey);
+  }catch(e){
+    // localStorage 失敗時用 sessionStorage
+    try{sessionStorage.setItem(STORAGE_KEY_API,apiKey);}catch(e2){}
+  }
+  updateApiStatus();
+  document.getElementById('setup-card').style.display='none';
+  showToast('✅ Groq API Key 已儲存！所有 AI 功能已啟用');
+}
+
+function updateApiStatus(){
+  const el=document.getElementById('api-status');
+  el.className='api-status ok';
+  el.innerHTML='<i class="ti ti-check"></i> AI 已連線';
+  document.getElementById('setup-card').style.display='none';
+}
+
+function saveData(){
+  try{
+    localStorage.setItem(STORAGE_KEY_TODOS,JSON.stringify(todos));
+    localStorage.setItem(STORAGE_KEY_MEETINGS,JSON.stringify(meetings));
+  }catch(e){
+    sessionStorage.setItem(STORAGE_KEY_TODOS,JSON.stringify(todos));
+    sessionStorage.setItem(STORAGE_KEY_MEETINGS,JSON.stringify(meetings));
+  }
+}
+
+// ── Morning ───────────────────────────────────────
+function initMorning(){
+  const now=new Date();
+  const h=now.getHours();
+  const g=h<12?'早安，總經理 ☀️':h<18?'午安，總經理 🌤️':'晚安，總經理 🌙';
+  document.getElementById('morning-date').textContent=`${now.getFullYear()}年${now.getMonth()+1}月${now.getDate()}日 星期${weekdays[now.getDay()]}`;
+  document.getElementById('morning-greeting').textContent=g;
+}
+
+function updateMorningStats(){
+  const pending=todos.filter(t=>!t.done).length;
+  const urgent=todos.filter(t=>{if(t.done||!t.date)return false;const d=daysUntil(t.date);return d!==null&&d<=3;}).length;
+  const today=todos.filter(t=>{if(t.done||!t.date)return false;return daysUntil(t.date)===0;}).length;
+  document.getElementById('morning-stats').innerHTML=`
+    <div class="morning-stat"><i class="ti ti-checkbox"></i> 待處理 <strong style="color:var(--text)">${pending}</strong> 件</div>
+    ${urgent?`<div class="morning-stat" style="color:var(--danger)"><i class="ti ti-alert-circle"></i> 即將到期 <strong>${urgent}</strong> 件</div>`:''}
+    ${today?`<div class="morning-stat" style="color:var(--purple)"><i class="ti ti-calendar"></i> 今日到期 <strong>${today}</strong> 件</div>`:''}
+  `;
+}
+
+// ── 天氣查詢（wttr.in，免費免金鑰）───────────────────────────────
+function translateWeather(desc){
+  const m={
+    'Sunny':'晴天','Clear':'晴天','Partly cloudy':'多雲時晴','Partly Cloudy':'多雲時晴',
+    'Cloudy':'陰天','Overcast':'多雲','Mist':'有霧','Fog':'大霧','Haze':'霾',
+    'Patchy rain possible':'局部有雨','Light rain':'小雨','Light rain shower':'短暫小雨',
+    'Moderate rain':'中雨','Moderate rain at times':'間歇中雨',
+    'Heavy rain':'大雨','Heavy rain at times':'間歇大雨','Heavy showers':'大陣雨',
+    'Light drizzle':'毛毛雨','Drizzle':'細雨','Freezing drizzle':'凍雨',
+    'Thundery outbreaks possible':'可能有雷陣雨',
+    'Patchy light rain with thunder':'局部雷陣雨',
+    'Moderate or heavy rain with thunder':'大雷陣雨',
+    'Blowing snow':'吹雪','Blizzard':'暴風雪',
+    'Light snow':'小雪','Moderate snow':'中雪','Heavy snow':'大雪',
+    'Light sleet':'輕度雨夾雪','Ice pellets':'冰雹',
+    'Patchy snow possible':'局部可能降雪',
+  };
+  return m[desc]||desc;
+}
+function uvDesc(uv){
+  const n=parseInt(uv);
+  if(n<=2)return'低';if(n<=5)return'中等';if(n<=7)return'高';if(n<=10)return'非常高';return'危險';
+}
+function uvColor(uv){
+  const n=parseInt(uv);
+  if(n<=2)return'#22c55e';if(n<=5)return'#eab308';if(n<=7)return'#f97316';return'#ef4444';
+}
+function _isMobile(){
+  return /Android|webOS|iPhone|iPad|iPod|IEMobile|Opera Mini/i.test(navigator.userAgent)||
+    (navigator.maxTouchPoints>1&&window.innerWidth<=1024);
+}
+async function loadWeather(city='',dayOffset=0,voiceMode=false){
+  const box=document.getElementById('weather-container');
+  box.innerHTML='<div class="loading-box"><i class="ti ti-loader-2 spin" style="font-size:22px;display:block;margin-bottom:6px"></i>查詢天氣中...</div>';
+
+  // 決定查詢地點：1.手動輸入城市 > 2.行動裝置GPS > 3.預設台中
+  let resolvedQuery='';
+  if(city){
+    resolvedQuery=encodeURIComponent(city);
+  }else if(_isMobile()&&navigator.geolocation){
+    try{
+      const pos=await new Promise((res,rej)=>
+        navigator.geolocation.getCurrentPosition(res,rej,{timeout:5000,maximumAge:300000}));
+      resolvedQuery=`${pos.coords.latitude.toFixed(4)},${pos.coords.longitude.toFixed(4)}`;
+    }catch(e){
+      resolvedQuery=encodeURIComponent('台中'); // GPS 拒絕/逾時，回退台中
+    }
+  }else{
+    resolvedQuery=encodeURIComponent('台中'); // 桌機預設台中
+  }
+
+  try{
+    const proxy='https://corsproxy.io/?';
+    const url=`${proxy}https://wttr.in/${resolvedQuery}?format=j1`;
+    const resp=await fetch(url,{signal:AbortSignal.timeout(8000)});
+    if(!resp.ok)throw new Error('查詢失敗');
+    const data=await resp.json();
+
+    const area=data.nearest_area[0];
+    const areaName=area.areaName[0].value;
+    const cc=data.current_condition[0];
+    const tempC=cc.temp_C;
+    const feelsLike=cc.FeelsLikeC;
+    const humidity=cc.humidity;
+    const desc=translateWeather(cc.weatherDesc[0].value);
+    const uv=cc.uvIndex;
+    const windKmph=cc.windspeedKmph;
+    const today=data.weather[0];
+    const maxT=today.maxtempC;
+    const minT=today.mintempC;
+    const rainChance=Math.max(...today.hourly.map(h=>parseInt(h.chanceofrain)));
+    const tomorrow=data.weather[1]||today;
+    const tomMaxT=tomorrow.maxtempC;
+    const tomMinT=tomorrow.mintempC;
+    const tomRain=Math.max(...tomorrow.hourly.map(h=>parseInt(h.chanceofrain)));
+    const tomDesc=translateWeather(tomorrow.hourly[4]?.weatherDesc[0].value||'');
+
+    // 渲染天氣卡片
+    box.innerHTML=`
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:4px">
+        <div style="background:var(--bg3);border-radius:10px;padding:14px">
+          <div style="font-size:12px;color:var(--text2);margin-bottom:4px"><i class="ti ti-map-pin"></i> ${areaName} · 現在</div>
+          <div style="font-size:32px;font-weight:600;color:var(--text);line-height:1">${tempC}°C</div>
+          <div style="font-size:14px;color:var(--text2);margin-top:4px">${desc}</div>
+          <div style="font-size:12px;color:var(--text2);margin-top:8px;display:flex;flex-wrap:wrap;gap:8px">
+            <span><i class="ti ti-thermometer"></i> 體感 ${feelsLike}°C</span>
+            <span><i class="ti ti-droplet"></i> 濕度 ${humidity}%</span>
+            <span><i class="ti ti-wind"></i> 風速 ${windKmph}km/h</span>
+          </div>
+        </div>
+        <div style="background:var(--bg3);border-radius:10px;padding:14px">
+          <div style="font-size:12px;color:var(--text2);margin-bottom:8px">今日 / 明日</div>
+          <div style="font-size:13px;margin-bottom:6px">
+            <span style="color:var(--text)">今天</span>
+            <span style="color:#ef4444;margin-left:8px">↑${maxT}°</span>
+            <span style="color:#60a5fa;margin-left:4px">↓${minT}°</span>
+            <span style="color:var(--text2);margin-left:8px;font-size:12px">🌧 ${rainChance}%</span>
+          </div>
+          <div style="font-size:13px;margin-bottom:10px">
+            <span style="color:var(--text2)">明天</span>
+            <span style="color:#ef4444;margin-left:8px">↑${tomMaxT}°</span>
+            <span style="color:#60a5fa;margin-left:4px">↓${tomMinT}°</span>
+            <span style="color:var(--text2);margin-left:8px;font-size:12px">🌧 ${tomRain}%</span>
+          </div>
+          <div style="font-size:12px">
+            <span style="background:${uvColor(uv)}22;color:${uvColor(uv)};padding:2px 8px;border-radius:20px;border:1px solid ${uvColor(uv)}44">
+              ☀️ UV ${uv}（${uvDesc(uv)}）
+            </span>
+          </div>
+        </div>
+      </div>
+      ${rainChance>50?'<div style="margin-top:8px;font-size:12px;color:#eab308;padding:6px 10px;background:#eab30811;border-radius:6px;border-left:3px solid #eab308"><i class="ti ti-umbrella"></i> 今日降雨機率較高，出門記得帶傘</div>':''}
+      ${parseInt(uv)>=6?'<div style="margin-top:6px;font-size:12px;color:#f97316;padding:6px 10px;background:#f9731611;border-radius:6px;border-left:3px solid #f97316"><i class="ti ti-sun"></i> 紫外線指數偏高，注意防曬</div>':''}
+    `;
+
+    // 語音模式播報
+    if(voiceMode){
+      let report='';
+      if(dayOffset===1){
+        // 只播明天
+        report=`${areaName}明天${tomDesc}，最高${tomMaxT}度，最低${tomMinT}度，降雨機率${tomRain}%，紫外線${uvDesc(tomorrow.uvIndex)}。`;
+        if(tomRain>50)report+='明天記得帶傘。';
+        if(parseInt(tomorrow.uvIndex)>=6)report+='外出注意防曬。';
+      }else{
+        // 播今天
+        report=`${areaName}目前${desc}，氣溫${tempC}度，體感${feelsLike}度。`;
+        report+=`今日最高${maxT}度，最低${minT}度，降雨機率${rainChance}%，紫外線${uvDesc(uv)}。`;
+        if(rainChance>50)report+='出門記得帶傘。';
+        if(parseInt(uv)>=6)report+='外出注意防曬。';
+      }
+      speakChain(report);
+    }
+  }catch(e){
+    box.innerHTML=`<div class="hint-box" style="color:var(--danger)"><i class="ti ti-alert-circle"></i> 天氣查詢失敗：${e.message}</div>`;
+    if(voiceMode)speakFeedback('天氣查詢失敗 請稍後再試');
+  }
+}
+
+const NEWS_API_KEY=localStorage.getItem('jyste_news_key')||'cc1b900baad94cd8bc2a69cc79739709';
+
+async function loadNews(voiceMode=false){
+  const btn=document.getElementById('news-btn');
+  btn.disabled=true;
+  document.getElementById('news-container').innerHTML=`<div class="loading-box"><i class="ti ti-loader-2 spin" style="font-size:28px;display:block;margin-bottom:8px"></i>載入今日真實新聞中...</div>`;
+  try{
+    // 直接解析 RSS XML（平行抓取，不依賴第三方 API key）
+    let allNews=[];
+
+    // 每個類別設主要來源 + Google News 備援
+    const GN='https://news.google.com/rss/search?hl=zh-TW&gl=TW&ceid=TW:zh-Hant&q=';
+    const rssFeeds=[
+      {cat:'台灣經濟/商業',cls:'cat-tw',
+       urls:['https://www.bnext.com.tw/rss',
+             'https://ctee.com.tw/feed',
+             GN+encodeURIComponent('台灣 商業 經濟')]},
+      {cat:'科技/AI',cls:'cat-tech',
+       urls:['https://technews.tw/feed/',
+             'https://ithome.com.tw/rss',
+             GN+encodeURIComponent('AI 人工智慧 科技')]},
+      {cat:'製造業/自動化',cls:'cat-mfg',
+       urls:['https://www.digitimes.com.tw/rss/rss.asp',
+             GN+encodeURIComponent('製造業 自動化 智慧工廠 台灣')]},
+      {cat:'國內財經',cls:'cat-finance',
+       urls:['https://ec.ltn.com.tw/rss/news.xml',
+             'https://www.moneydj.com/KMDJ/RSS/RSSReaderFull.aspx?param=mb020000',
+             GN+encodeURIComponent('台灣 股市 財經 投資 上市')]},
+      {cat:'國際財經',cls:'cat-global',
+       urls:['https://ec.ltn.com.tw/rss/business.xml',
+             'https://feeds.bbci.co.uk/zhongwen/trad/business/rss.xml',
+             GN+encodeURIComponent('國際 財經 美股 聯準會 全球經濟')]}
+    ];
+
+    // 使用 rss2json.com API（專為 RSS 轉 JSON 設計，CORS 友善，免費）
+    async function fetchFeed(feed){
+      for(const url of feed.urls){
+        try{
+          const apiUrl=`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(url)}&count=3`;
+          const r=await fetch(apiUrl,{signal:AbortSignal.timeout(7000)});
+          if(!r.ok)continue;
+          const data=await r.json();
+          if(data.status!=='ok'||!data.items?.length)continue;
+          const parsed=data.items.slice(0,2).map(item=>{
+            const title=(item.title||'').trim();
+            if(!title)return null;
+            const desc=(item.description||item.content||'').replace(/<[^>]*>/g,'').trim().slice(0,120);
+            return {cat:feed.cat,cls:feed.cls,title,source:data.feed?.title||feed.cat,
+                    summary:desc,url:item.link||'',publishedAt:item.pubDate||''};
+          }).filter(Boolean);
+          if(parsed.length>0)return parsed;
+        }catch(e){}
+      }
+      return [];
+    }
+
+    // 四條 RSS 同時平行抓取
+    const fetched=await Promise.allSettled(rssFeeds.map(fetchFeed));
+    fetched.forEach(r=>{if(r.status==='fulfilled')allNews.push(...r.value);});
+
+    // RSS 全部失敗時，用 Groq AI 補充（需有 API Key）
+    if(allNews.length===0){
+      if(!apiKey){throw new Error('RSS 來源暫時無法連線，請稍後再試或設定 Groq API Key 使用 AI 新聞');}
+      const res=await callGemini(`你是新聞助理。請提供10則重要新聞，分五類：製造業/自動化、台灣經濟/商業、國內財經、國際財經、科技/AI。JSON格式：{"news":[{"cat":"製造業/自動化","title":"標題","source":"媒體","summary":"摘要"}]}`);
+      try{
+        const parsed=JSON.parse(res.replace(/```json|```/g,'').trim());
+        const catCls={'製造業/自動化':'cat-mfg','台灣經濟/商業':'cat-tw','國際財經':'cat-global','科技/AI':'cat-tech','國內財經':'cat-finance'};
+        parsed.news.forEach(n=>allNews.push({cat:n.cat,cls:catCls[n.cat]||'cat-global',title:n.title,source:n.source,summary:n.summary,url:'',publishedAt:''}));
+      }catch(e){}
+    }
+
+    if(allNews.length===0){throw new Error('RSS 來源暫時無法連線，請稍後再試');}
+
+    _voiceNewsItems=allNews; // 儲存供語音分析使用
+
+    // 語音模式：載完後朗讀所有標題
+    if(voiceMode&&isAwake&&voiceCtrlActive){
+      const nums=['第一條','第二條','第三條','第四條','第五條','第六條','第七條','第八條'];
+      const titleText=allNews.map((n,i)=>`${nums[i]}：${n.title.split(' - ')[0]}`).join('。');
+      setTimeout(()=>speakChain('新聞載入完成，'+titleText+'。如有興趣請說第幾條分析'),800);
+    }
+
+    document.getElementById('news-container').innerHTML=allNews.map((n,i)=>{
+      const date=n.publishedAt?new Date(n.publishedAt).toLocaleDateString('zh-TW'):'';
+      const title=n.title.split(' - ')[0]; // 移除來源後綴
+      return `
+      <div class="news-item">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px">
+          <span class="news-cat ${n.cls}">${n.cat}</span>
+          <span style="font-size:11px;color:var(--text2);background:var(--bg3);padding:2px 8px;border-radius:20px;border:1px solid var(--border)">
+            <i class="ti ti-news" style="font-size:11px"></i> ${n.source}
+          </span>
+          ${date?`<span style="font-size:11px;color:var(--text2)">${date}</span>`:''}
+        </div>
+        <div class="news-title" onclick="window.open('${n.url}','_blank')" style="cursor:pointer" title="點擊開啟原文">${title}</div>
+        <div class="news-summary" style="margin-top:4px">${n.summary}</div>
+        <div style="display:flex;gap:12px;margin-top:6px">
+          <div class="news-expand" onclick="expandNews(${i},'${encodeURIComponent(title)}','${encodeURIComponent(n.source)}','${encodeURIComponent(n.summary)}')">
+            <i class="ti ti-zoom-in"></i> AI 深度分析
+          </div>
+          ${n.url?`<div class="news-expand" onclick="window.open('${n.url}','_blank')" style="color:var(--text2)"><i class="ti ti-external-link"></i> 閱讀原文</div>`:''}
+        </div>
+        <div class="news-detail" id="news-detail-${i}"></div>
+      </div>`;
+    }).join('');
+
+  }catch(e){
+    document.getElementById('news-container').innerHTML=`<div class="hint-box" style="color:var(--danger)"><i class="ti ti-alert-circle"></i> 載入失敗：${e.message}</div>`;
+  }
+  btn.disabled=false;
+}
+
+async function expandNews(idx,titleEncoded,sourceEncoded){
+  const detail=document.getElementById(`news-detail-${idx}`);
+  if(detail.style.display==='block'){detail.style.display='none';return;}
+  const title=decodeURIComponent(titleEncoded);
+  const source=decodeURIComponent(sourceEncoded||'');
+  detail.style.display='block';
+  if(!apiKey){
+    detail.innerHTML='<span style="color:var(--warning)">⚠️ 請先在右上角設定 Groq API Key 才能使用 AI 深度分析</span>';
+    return;
+  }
+  detail.innerHTML='<i class="ti ti-loader-2 spin"></i> 深度分析中...';
+  try{
+    const res=await callGemini(`你是鈞曜科技（台灣物料管理設備製造商，產品：垂直式/旋轉式自動倉儲）總經理的AI秘書。請針對以下新聞進行深度分析，用繁體中文回覆：
+
+新聞來源：${source}
+新聞標題：${title}
+
+【新聞概要】用3句話說明主要內容。
+【對產業的影響】說明對台灣製造業、自動化產業的影響。
+【對鈞曜科技的意義】具體說明商機、風險或注意事項。
+【行動建議】給出1～2個具體可行的建議。`);
+    detail.innerHTML=res.replace(/\n/g,'<br>');
+  }catch(e){
+    detail.innerHTML=`<span style="color:var(--danger)">⚠️ 分析失敗：${e.message}</span>`;
+  }
+}
+
+// ── Recording（Groq Whisper 台語辨識）───────────────
+let mediaRecorder=null, audioChunks=[], recInterval=null, recSeconds=0, isRecording=false;
+
+async function toggleRecord(){
+  if(!isRecording){
+    if(!apiKey){showToast('請先設定 Groq API Key');return;}
+    try{
+      const stream=await navigator.mediaDevices.getUserMedia({audio:true});
+      // 優先使用 mp4，否則用 webm
+      const mimeType=MediaRecorder.isTypeSupported('audio/mp4')?'audio/mp4':'audio/webm';
+      mediaRecorder=new MediaRecorder(stream,{mimeType});
+      audioChunks=[];
+      mediaRecorder.ondataavailable=e=>{if(e.data.size>0)audioChunks.push(e.data);};
+      mediaRecorder.onstop=async()=>{
+        stream.getTracks().forEach(t=>t.stop());
+        await transcribeWithWhisper(mimeType);
+      };
+      mediaRecorder.start(1000);
+      isRecording=true;
+      recSeconds=0;
+      document.getElementById('rec-btn').className='rec-btn recording';
+      document.getElementById('rec-icon').className='ti ti-player-stop';
+      document.getElementById('rec-status').textContent='🔴 錄音中（支援台語）...';
+      document.getElementById('rec-timer').style.display='block';
+      document.getElementById('rec-hint').textContent='說完後再點一次停止，支援國語／台語混合';
+      recInterval=setInterval(()=>{
+        recSeconds++;
+        const m=String(Math.floor(recSeconds/60)).padStart(2,'0');
+        const s=String(recSeconds%60).padStart(2,'0');
+        document.getElementById('rec-timer').textContent=m+':'+s;
+      },1000);
+    }catch(e){
+      if(e.name==='NotAllowedError'){
+        alert('請允許麥克風權限！\n點擊網址列左邊的圖示 → 麥克風 → 允許');
+      }else{
+        showToast('錯誤：'+e.message);
+      }
+    }
+  }else{
+    clearInterval(recInterval);
+    mediaRecorder.stop();
+    isRecording=false;
+    document.getElementById('rec-btn').className='rec-btn idle';
+    document.getElementById('rec-icon').className='ti ti-microphone';
+    document.getElementById('rec-status').textContent='⏳ AI 辨識中，請稍候...';
+    document.getElementById('rec-timer').style.display='none';
+    document.getElementById('rec-hint').textContent='Groq Whisper 辨識台語中...';
+  }
+}
+
+async function transcribeWithWhisper(mimeType){
+  try{
+    const ext=mimeType.includes('mp4')?'mp4':'webm';
+    const blob=new Blob(audioChunks,{type:mimeType});
+    const formData=new FormData();
+    formData.append('file',blob,'recording.'+ext);
+    formData.append('model','whisper-large-v3');
+    formData.append('language','zh');
+    formData.append('response_format','text');
+
+    const res=await fetch('https://api.groq.com/openai/v1/audio/transcriptions',{
+      method:'POST',
+      headers:{'Authorization':'Bearer '+apiKey},
+      body:formData
+    });
+
+    if(!res.ok){
+      const e=await res.json();
+      throw new Error(e.error?.message||'辨識失敗');
+    }
+
+    const text=await res.text();
+    if(text&&text.trim()){
+      const cur=document.getElementById('meeting-input').value;
+      document.getElementById('meeting-input').value=(cur?cur+'\n':'')+text.trim();
+      document.getElementById('rec-status').textContent='✅ 辨識完成！';
+      showToast('✅ 台語／國語語音已轉換成文字！');
+    }else{
+      document.getElementById('rec-status').textContent='點擊開始錄音';
+      showToast('⚠️ 沒有偵測到語音，請再試一次');
+    }
+  }catch(e){
+    document.getElementById('rec-status').textContent='點擊開始錄音';
+    showToast('⚠️ 辨識失敗：'+e.message);
+  }
+  document.getElementById('rec-hint').textContent='錄音結束後，語音會自動轉成文字填入下方';
+}
+
+// ── Meeting ───────────────────────────────────────
+// ── 會議參考文件上傳與文字抽取 ──────────────────────────────
+function renderMeetingDocs(){
+  const list=document.getElementById('meeting-docs-list');
+  if(!list)return;
+  if(!_meetingDocs.length){list.innerHTML='';return;}
+  list.innerHTML=_meetingDocs.map((d,i)=>`
+    <div class="doc-item">
+      <i class="ti ti-file-text"></i>
+      <span class="doc-item-name" title="${d.name}">${d.name}</span>
+      <span class="doc-item-size">${d.pages?d.pages+'頁':''}${d.words?'・約'+d.words+'字':''}</span>
+      <button class="doc-item-del" onclick="removeMeetingDoc(${i})" title="移除"><i class="ti ti-x"></i></button>
+    </div>`).join('');
+}
+
+function removeMeetingDoc(idx){
+  _meetingDocs.splice(idx,1);
+  renderMeetingDocs();
+  showToast('文件已移除');
+}
+
+function handleDocDrop(e){
+  e.preventDefault();
+  document.getElementById('doc-drop-zone').classList.remove('dragover');
+  handleMeetingDocUpload(e.dataTransfer.files);
+}
+
+async function handleMeetingDocUpload(files){
+  if(!files||!files.length)return;
+  const zone=document.getElementById('doc-drop-zone');
+  const origHTML=zone.innerHTML;
+  zone.innerHTML='<i class="ti ti-loader-2 spin" style="font-size:24px;display:block;margin-bottom:6px"></i>讀取文件中...';
+  zone.style.pointerEvents='none';
+
+  for(const file of Array.from(files)){
+    try{
+      let text='';
+      const ext=file.name.split('.').pop().toLowerCase();
+      if(ext==='pdf'){
+        text=await _extractPDF(file);
+      }else if(ext==='docx'||ext==='doc'){
+        text=await _extractDOCX(file);
+      }else{
+        text=await file.text();
+      }
+      if(!text.trim()){showToast('⚠️ '+file.name+' 無法抽取文字，請確認檔案內容');continue;}
+      const words=text.trim().split(/\s+/).length;
+      _meetingDocs.push({name:file.name,content:text.substring(0,8000),words:Math.min(words,8000)});
+    }catch(e){
+      showToast('⚠️ '+file.name+' 讀取失敗：'+e.message);
+    }
+  }
+
+  zone.innerHTML=origHTML;
+  zone.style.pointerEvents='';
+  renderMeetingDocs();
+  if(_meetingDocs.length)showToast('✅ 已上傳 '+_meetingDocs.length+' 份參考文件');
+}
+
+async function _extractPDF(file){
+  if(typeof pdfjsLib==='undefined')throw new Error('PDF 解析器未載入');
+  pdfjsLib.GlobalWorkerOptions.workerSrc=
+    'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+  const ab=await file.arrayBuffer();
+  const pdf=await pdfjsLib.getDocument({data:ab}).promise;
+  let text='';
+  const maxPages=Math.min(pdf.numPages,20);
+  for(let i=1;i<=maxPages;i++){
+    const page=await pdf.getPage(i);
+    const tc=await page.getTextContent();
+    text+=tc.items.map(it=>it.str).join(' ')+'\n';
+  }
+  return text;
+}
+
+async function _extractDOCX(file){
+  if(typeof mammoth==='undefined')throw new Error('Word 解析器未載入');
+  const ab=await file.arrayBuffer();
+  const result=await mammoth.extractRawText({arrayBuffer:ab});
+  return result.value||'';
+}
+
+async function processMeeting(){
+  if(!apiKey){showToast('請先設定 API Key');document.getElementById('setup-card').style.display='block';return;}
+  const input=document.getElementById('meeting-input').value.trim();
+  if(!input){showToast('請先輸入會議內容');return;}
+  document.getElementById('meeting-loading').style.display='block';
+  document.getElementById('meeting-result').style.display='none';
+  document.getElementById('import-row').style.display='none';
+  try{
+    // 組合參考文件區塊
+    const docSection=_meetingDocs.length>0
+      ?'\n\n【會議前參考文件】（請結合以下文件內容，讓摘要和待辦更精確）\n'
+        +_meetingDocs.map((d,i)=>'--- 文件'+(i+1)+'：'+d.name+' ---\n'+d.content).join('\n\n')
+      :'';
+
+    const res=await callGemini(`你是鈞曜科技有限公司（物料管理設備製造商，產品：垂直式/旋轉式自動倉儲）總經理的AI秘書。請整理以下會議記錄，用繁體中文回覆。${_meetingDocs.length>0?'本次附有'+_meetingDocs.length+'份參考文件，請結合文件內容讓摘要更完整、待辦更具體。':''}
+
+📋 會議摘要
+主題：
+日期：（未提及寫「未記錄」）
+出席人員：（未提及寫「未記錄」）
+
+🎯 重要討論重點
+1.
+2.
+
+✅ 待辦事項
+（格式：事項 | 負責人 | 截止日期）
+
+📌 下次追蹤事項
+1.
+
+---TODOS---
+（每行一項，格式：事項||負責人||截止日期，未知寫空白）
+
+【會議記錄原文】
+${input}${docSection}`);
+    const parts=res.split('---TODOS---');
+    const display=parts[0].trim();
+    lastExtractedTodos=[];
+    if(parts[1]){
+      parts[1].trim().split('\n').forEach(line=>{
+        line=line.trim();if(!line)return;
+        const c=line.split('||');
+        lastExtractedTodos.push({text:c[0]||line,person:c[1]||'',date:c[2]||''});
+      });
+    }
+    document.getElementById('meeting-result').style.display='block';
+    document.getElementById('meeting-result').textContent=display;
+    if(lastExtractedTodos.length>0)document.getElementById('import-row').style.display='block';
+    const title=input.substring(0,30)+(input.length>30?'...':'');
+    // 記錄參考文件名稱（只存名稱，不存內容）
+    const refDocs=_meetingDocs.map(d=>d.name);
+    const newMeeting={id:Date.now(),title,date:new Date().toLocaleDateString('zh-TW'),content:display,refDocs};
+    meetings.unshift(newMeeting);
+    if(meetings.length>30)meetings.pop();
+    sbInsert('meetings',newMeeting).catch(()=>{});
+    saveData();renderHistory();
+    // 整理完成後清除參考文件（內容不保留，只有名稱已存入紀錄）
+    if(_meetingDocs.length>0){
+      _meetingDocs=[];
+      renderMeetingDocs();
+      showToast('✅ 整理完成，參考文件已清除');
+    }
+  }catch(e){
+    document.getElementById('meeting-result').style.display='block';
+    document.getElementById('meeting-result').textContent='⚠️ 錯誤：'+e.message;
+  }
+  document.getElementById('meeting-loading').style.display='none';
+}
+
+function importTodos(){
+  lastExtractedTodos.forEach((t,i)=>{
+    const todo={id:Date.now()+i,text:t.text,person:t.person||'',date:t.date||'',time:'',done:false};
+    todos.push(todo);
+    sbInsert('todos',todo).catch(()=>{}); // 同步到 Supabase，確保重整後不消失
+  });
+  saveData();renderTodos();updateMorningStats();checkReminders();
+  switchTab('todo');showToast('✅ 待辦事項已匯入！');
+}
+
+// ── Groq API ──────────────────────────────────────
+async function callGemini(prompt){
+  // 支援傳入字串（單輪）或 messages array（多輪對話）
+  const msgs=Array.isArray(prompt)?prompt:[{role:'user',content:prompt}];
+  const res=await fetch('https://api.groq.com/openai/v1/chat/completions',{
+    method:'POST',
+    headers:{'Content-Type':'application/json','Authorization':'Bearer '+apiKey},
+    body:JSON.stringify({
+      model:'llama-3.3-70b-versatile',
+      messages:msgs,
+      max_tokens:2000
+    })
+  });
+  if(!res.ok){
+    const e=await res.json();
+    const msg=e.error?.message||'API 錯誤';
+    if(msg.includes('rate')||msg.includes('limit')){
+      throw new Error('使用次數暫時達到上限，請稍後再試。');
+    }
+    if(msg.includes('auth')||msg.includes('key')||msg.includes('invalid')){
+      throw new Error('API Key 有誤，請點右上角「更換Key」重新輸入。');
+    }
+    throw new Error(msg);
+  }
+  const data=await res.json();
+  return data.choices?.[0]?.message?.content||'';
+}
+
+// ── Todo ──────────────────────────────────────────
+function daysUntil(dateStr){
+  if(!dateStr)return null;
+  const today=new Date();today.setHours(0,0,0,0);
+  const target=new Date(dateStr);target.setHours(0,0,0,0);
+  return Math.round((target-today)/(1000*60*60*24));
+}
+
+function urgencyBadge(todo){
+  if(todo.done||!todo.date)return`<span class="badge ${todo.done?'badge-done':'badge-pending'}">${todo.done?'已完成':'待處理'}</span>`;
+  const d=daysUntil(todo.date);
+  if(d<0)return`<span class="badge badge-urgent">⚠️ 逾期${Math.abs(d)}天</span>`;
+  if(d===0)return`<span class="badge badge-today">📌 今天到期</span>`;
+  if(d===1)return`<span class="badge badge-urgent">🔴 明天到期</span>`;
+  if(d<=3)return`<span class="badge badge-soon">🟡 ${d}天後到期</span>`;
+  return`<span class="badge badge-pending">待處理</span>`;
+}
+
+function checkReminders(){
+  const alert=document.getElementById('reminder-alert');
+  const list=document.getElementById('reminder-list');
+  const urgent=todos.filter(t=>{if(t.done||!t.date)return false;const d=daysUntil(t.date);return d!==null&&d<=3;});
+  if(!urgent.length){alert.style.display='none';return;}
+  list.innerHTML=urgent.sort((a,b)=>daysUntil(a.date)-daysUntil(b.date)).map(t=>{
+    const d=daysUntil(t.date);
+    const label=d<0?`逾期${Math.abs(d)}天`:d===0?'今天到期':d===1?'明天到期':`${d}天後到期`;
+    return`<li><strong>${t.text}</strong>（${label}${t.person?' ・ '+t.person:''}）</li>`;
+  }).join('');
+  alert.style.display='block';
+  scheduleNotif(urgent);
+}
+
+function checkNotifPermission(){
+  if('Notification' in window&&Notification.permission==='default')
+    document.getElementById('notif-bar').style.display='flex';
+}
+
+async function requestNotif(){
+  if(!('Notification' in window))return;
+  const r=await Notification.requestPermission();
+  if(r==='granted'){
+    document.getElementById('notif-bar').style.display='none';
+    new Notification('🤖 鈞曜科技 AI 秘書',{body:'到期提醒已開啟！'});
+    showToast('✅ 通知已開啟！');
+  }
+}
+
+function scheduleNotif(urgent){
+  if(Notification.permission!=='granted'||!urgent.length)return;
+  const body=urgent.map(t=>{const d=daysUntil(t.date);return`・${t.text}（${d===0?'今天到期':d===1?'明天到期':d+'天後到期'}）`;}).join('\n');
+  setTimeout(()=>new Notification('⚠️ 待辦事項到期提醒',{body}),800);
+}
+
+// ── 快速指令對話記憶 ──────────────────────────────────────────
+let _cmdHistory = []; // [{role:'user'|'assistant', content:'...', html:'...'}]
+
+function _appendCmdBubble(role, text, html){
+  const chatEl = document.getElementById('cmd-chat');
+  chatEl.style.display = 'flex';
+  document.getElementById('cmd-clear-btn').style.display = '';
+
+  const bubble = document.createElement('div');
+  const isUser = role==='user';
+  bubble.style.cssText = `
+    max-width:85%;align-self:${isUser?'flex-end':'flex-start'};
+    background:${isUser?'linear-gradient(135deg,#1d4ed8,#0891b2)':'var(--bg2)'};
+    color:${isUser?'#fff':'var(--text)'};
+    border:${isUser?'none':'1px solid var(--border)'};
+    border-radius:${isUser?'14px 14px 4px 14px':'14px 14px 14px 4px'};
+    padding:8px 12px;font-size:13px;line-height:1.6;
+  `;
+  bubble.innerHTML = html || text;
+  chatEl.appendChild(bubble);
+  chatEl.scrollTop = chatEl.scrollHeight;
+}
+
+function clearCmdChat(){
+  _cmdHistory = [];
+  const chatEl = document.getElementById('cmd-chat');
+  chatEl.innerHTML = '';
+  chatEl.style.display = 'none';
+  document.getElementById('cmd-clear-btn').style.display = 'none';
+  document.getElementById('cmd-result').style.display = 'none';
+}
+
+async function processQuickCmd(){
+  const input = document.getElementById('cmd-input');
+  const resultEl = document.getElementById('cmd-result');
+  const cmd = input.value.trim();
+  if(!cmd) return;
+
+  const btn = document.getElementById('cmd-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="ti ti-loader-2"></i> 處理中...';
+  resultEl.style.display = 'none';
+
+  // 顯示使用者訊息泡泡
+  _appendCmdBubble('user', cmd, cmd);
+  input.value = '';
+
+  function done(html, isWarn){
+    _appendCmdBubble('assistant', html, (isWarn?'⚠️ ':'')+html);
+    // 記入歷史（純文字版，供 AI context 用）
+    const plainText = html.replace(/<[^>]+>/g,'');
+    _cmdHistory.push({role:'user', content:cmd});
+    _cmdHistory.push({role:'assistant', content:plainText});
+    // 只保留最近 20 輪
+    if(_cmdHistory.length > 40) _cmdHistory = _cmdHistory.slice(_cmdHistory.length-40);
+    btn.disabled = false;
+    btn.innerHTML = '<i class="ti ti-sparkles"></i> AI執行';
+  }
+
+  try{
+    // ── 結束話題 ────────────────────────
+    if(/結束|清除|新話題|換個話題|算了/.test(cmd)){
+      clearCmdChat();
+      btn.disabled = false;
+      btn.innerHTML = '<i class="ti ti-sparkles"></i> AI執行';
+      return;
+    }
+
+    // ── 新增待辦 ──────────────────────
+    if(/新增|加入|加個|幫我加|提醒我?|記一下|記錄/.test(cmd)){
+      const taskRaw = cmd.replace(/^(新增|加入|加個|幫我加|提醒我?|記一下|記錄)/,'').trim();
+      const date = parseVoiceDate(taskRaw);
+      const task = taskRaw
+        .replace(/今天|明天|後天|大後天|月底|下週[一二三四五六日]|下星期[一二三四五六日]|這週[一二三四五六日]|這星期[一二三四五六日]|星期[一二三四五六日]|\d{1,2}月\d{1,2}[號日]?/g,'')
+        .replace(/^\s*(要|去|跟|幫|把|的)\s*/,'').replace(/\s+/g,' ').trim();
+      if(task){
+        const todo = {id:Date.now(), text:task, person:'', date:date, time:'', done:false};
+        todos.push(todo);
+        sbInsert('todos', todo).catch(()=>{});
+        saveData(); renderTodos(); updateMorningStats(); checkReminders();
+        done('✅ 已新增待辦：<strong>'+task+'</strong>'+(date?' | 日期：'+date:'')); return;
+      }
+    }
+
+    // ── 查詢今天/明天待辦 ────────────
+    if(/今天有什麼|今天的事|今日|今天幾件|明天有什麼|明天的事|有幾件|幾個待辦|待辦清單|所有待辦/.test(cmd)){
+      const now = new Date();
+      const pad = n=>String(n).padStart(2,'0');
+      const today = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
+      const tom = new Date(now); tom.setDate(tom.getDate()+1);
+      const tomorrow = `${tom.getFullYear()}-${pad(tom.getMonth()+1)}-${pad(tom.getDate())}`;
+      const isTomQuery = /明天/.test(cmd);
+      const target = isTomQuery ? tomorrow : today;
+      const filtered = todos.filter(t=>!t.done && (!t.date || t.date===target));
+      const label = isTomQuery ? '明天' : '今天';
+      if(filtered.length===0){ done('📋 '+label+'沒有待辦事項'); return; }
+      let html = '📋 <strong>'+label+'待辦（'+filtered.length+'件）</strong><ul style="margin:6px 0 0 0;padding-left:20px">';
+      filtered.forEach(t=>{ html += '<li>'+t.text+(t.date?' <small>('+t.date+')</small>':'')+'</li>'; });
+      html += '</ul>';
+      done(html); return;
+    }
+
+    // ── 最重要/優先事項 ───────────────
+    if(/最重要|最急|最優先|最緊急/.test(cmd)){
+      const pending = todos.filter(t=>!t.done);
+      if(pending.length===0){ done('📋 目前沒有未完成的待辦事項'); return; }
+      const withDate = pending.filter(t=>t.date).sort((a,b)=>a.date.localeCompare(b.date));
+      const noDate = pending.filter(t=>!t.date);
+      const top = (withDate.length ? withDate : noDate).slice(0,3);
+      let html = '🔥 <strong>最優先待辦</strong><ul style="margin:6px 0 0 0;padding-left:20px">';
+      top.forEach(t=>{ html += '<li>'+t.text+(t.date?' <small>('+t.date+')</small>':'')+'</li>'; });
+      html += '</ul>';
+      done(html); return;
+    }
+
+    // ── 天氣 ────────────────────────
+    if(/天氣|氣溫|下雨|颱風|幾度/.test(cmd)){
+      await loadWeather('', 0, false);
+      switchTab('home');
+      done('🌤️ 已更新天氣資訊，請看首頁天氣區塊'); return;
+    }
+
+    // ── 完成待辦 ──────────────────────
+    if(/完成|打勾|已做|做完|搞定/.test(cmd)){
+      const keyword = cmd.replace(/完成|打勾|已做|做完|搞定|把|幫我|標記為/g,'').trim();
+      const found = todos.find(t=>!t.done && t.text.includes(keyword));
+      if(found){
+        found.done = true;
+        if(!_completedToday.find(x=>x.id===found.id)) _completedToday.push({...found});
+        sbUpdate('todos', found.id, {done:true}).catch(()=>{});
+        saveData(); renderTodos(); updateMorningStats();
+        done('✅ 已完成：<strong>'+found.text+'</strong>'); return;
+      }
+      done('找不到包含「'+keyword+'」的待辦事項'); return;
+    }
+
+    // ── 刪除待辦 ──────────────────────
+    if(/刪除|刪掉|移除|取消(?!語音)/.test(cmd)){
+      const keyword = cmd.replace(/刪除|刪掉|移除|取消|把|幫我/g,'').trim();
+      const found = todos.find(t=>t.text.includes(keyword));
+      if(found){
+        todos = todos.filter(t=>String(t.id)!==String(found.id));
+        sbDelete('todos', found.id).catch(()=>{});
+        saveData(); renderTodos(); updateMorningStats();
+        done('🗑️ 已刪除：<strong>'+found.text+'</strong>'); return;
+      }
+      done('找不到包含「'+keyword+'」的待辦事項'); return;
+    }
+
+    // ── 統計 ─────────────────────────
+    if(/幾件|幾個|多少|統計|摘要|概況/.test(cmd)&&!_cmdHistory.length){
+      const total = todos.filter(t=>!t.done).length;
+      const doneCnt = todos.filter(t=>t.done).length;
+      const now = new Date();
+      const pad = n=>String(n).padStart(2,'0');
+      const today = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
+      const overdue = todos.filter(t=>!t.done && t.date && t.date < today).length;
+      done(`📊 <strong>待辦統計</strong>：未完成 <strong>${total}</strong> 件、已完成 ${doneCnt} 件${overdue?'、<span style="color:var(--danger)">已逾期 '+overdue+' 件</span>':''}`);
+      return;
+    }
+
+    // ── AI 多輪對話 ──────────────────
+    if(!apiKey){ done('請先設定 API Key 才能使用 AI 問答功能'); return; }
+    const todosContext = todos.filter(t=>!t.done).slice(0,10).map(t=>t.text+(t.date?' ('+t.date+')':'')).join('、');
+    const systemMsg = {role:'system', content:`你是鈞曜科技總經理Bruce的AI秘書，名字叫刀疤。
+今天日期：${new Date().toLocaleDateString('zh-TW')}
+未完成待辦：${todosContext||'無'}
+請用繁體中文回答，語氣親切簡短，每次回覆不超過150字。`};
+
+    // 組合歷史 + 新訊息
+    const messages = [systemMsg, ..._cmdHistory, {role:'user', content:cmd}];
+    const reply = await callGemini(messages);
+    const replyHtml = reply.split('\n').join('<br>');
+    done(replyHtml);
+
+  }catch(e){
+    done('❌ 發生錯誤：' + (e.message||e));
+    btn.disabled = false;
+    btn.innerHTML = '<i class="ti ti-sparkles"></i> AI執行';
+  }
+}
+
+
+async function addTodo(){
+  const text=document.getElementById('todo-input').value.trim();
+  if(!text){showToast('請輸入待辦事項');return;}
+  const person=document.getElementById('todo-person').value.trim();
+  const date=document.getElementById('todo-date').value;
+  const time=document.getElementById('todo-time').value;
+  const addCal=document.getElementById('add-to-cal').checked;
+  const todo={id:Date.now(),text,person,date,time,done:false};
+  todos.push(todo);
+  document.getElementById('todo-input').value='';
+  document.getElementById('todo-person').value='';
+  document.getElementById('todo-date').value='';
+  document.getElementById('todo-time').value='';
+  document.getElementById('add-to-cal').checked=false;
+  if(addCal)downloadICS(todo.id);
+  // 同步到 Supabase
+  sbInsert('todos',todo).catch(()=>{});
+  saveData();renderTodos();updateMorningStats();checkReminders();
+  showToast('✅ 待辦事項已新增！');
+}
+
+function toggleTodo(id){
+  const t=todos.find(t=>t.id===id);
+  if(t){
+    t.done=!t.done;
+    // 剛完成：記錄到本日追蹤清單
+    if(t.done){
+      if(!_completedToday.find(x=>x.id===t.id)) _completedToday.push({...t});
+    }else{
+      // 取消完成：從追蹤清單移除
+      _completedToday=_completedToday.filter(x=>x.id!==t.id);
+    }
+    sbUpdate('todos',t.id,{done:t.done}).catch(()=>{});
+    saveData();renderTodos();updateMorningStats();checkReminders();
+  }
+}
+
+async function deleteTodo(id){
+  // 先從本機移除
+  todos=todos.filter(t=>String(t.id)!==String(id));
+  saveData();renderTodos();updateMorningStats();checkReminders();
+  // 同步刪除 Supabase
+  try{await sbDelete('todos',id);}catch(e){}
+}
+
+function editTodo(id){
+  const t=todos.find(x=>x.id===id);
+  if(!t)return;
+  const el=document.querySelector(`.todo-item[data-id="${id}"]`);
+  if(!el)return;
+  const esc=s=>(s||'').replace(/"/g,'&quot;');
+  el.innerHTML=`
+    <div style="flex:1;width:100%">
+      <input id="et-text-${id}" type="text" value="${esc(t.text)}"
+        style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg3);color:var(--text);font-size:14px;box-sizing:border-box" />
+      <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;align-items:center">
+        <input id="et-person-${id}" type="text" value="${esc(t.person)}" placeholder="負責人"
+          style="flex:1;min-width:80px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg3);color:var(--text);font-size:12px" />
+        <input id="et-date-${id}" type="date" value="${t.date||''}"
+          style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg3);color:var(--text);font-size:12px" />
+        <input id="et-time-${id}" type="time" value="${t.time||''}"
+          style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg3);color:var(--text);font-size:12px" />
+      </div>
+      <div style="display:flex;gap:6px;margin-top:8px">
+        <button class="btn-primary" style="padding:5px 14px;font-size:13px" onclick="saveTodo(${id})">
+          <i class="ti ti-check"></i> 儲存
+        </button>
+        <button onclick="renderTodos()"
+          style="padding:5px 14px;font-size:13px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;cursor:pointer;color:var(--text)">
+          取消
+        </button>
+      </div>
+    </div>`;
+  document.getElementById('et-text-'+id)?.focus();
+}
+
+function saveTodo(id){
+  const t=todos.find(x=>x.id===id);
+  if(!t)return;
+  const text=document.getElementById('et-text-'+id)?.value.trim();
+  if(text)t.text=text;
+  t.person=document.getElementById('et-person-'+id)?.value.trim()||'';
+  t.date=document.getElementById('et-date-'+id)?.value||'';
+  t.time=document.getElementById('et-time-'+id)?.value||'';
+  saveData();
+  sbUpdate('todos',id,{text:t.text,person:t.person,date:t.date,time:t.time}).catch(()=>{});
+  renderTodos();updateMorningStats();
+  showToast('待辦已更新');
+}
+
+function setFilter(f,el){
+  currentFilter=f;
+  document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));
+  el.classList.add('active');renderTodos();
+}
+
+function isMeetingTodo(text){
+  return ['開會','會議','meeting','拜訪','客戶會','簡報','報告','討論','協調'].some(w=>text&&text.includes(w));
+}
+
+async function generateMeetingPrep(id){
+  const todo=todos.find(t=>t.id===id);
+  if(!todo)return;
+  if(!apiKey){showToast('請先設定 API Key');return;}
+  showToast('正在產生會議準備清單...',5000);
+  try{
+    const res=await callGemini(`你是鈞曜科技AI秘書。針對以下會議待辦，用繁體中文列出5項會議前準備建議（簡短條列）：\n${todo.text}`);
+    const clean=res.replace(/[#*]/g,'').trim();
+    alert('📋 會議準備建議\n\n'+clean);
+  }catch(e){showToast('產生失敗，請稍後再試');}
+}
+
+function renderTodos(){
+  const list=document.getElementById('todo-list');
+  let filtered=todos.filter(t=>{
+    if(currentFilter==='all')return true;
+    if(currentFilter==='done')return t.done;
+    if(currentFilter==='urgent'){if(t.done||!t.date)return false;const d=daysUntil(t.date);return d!==null&&d<=3;}
+    return !t.done;
+  });
+  const urgentCount=todos.filter(t=>{if(t.done||!t.date)return false;const d=daysUntil(t.date);return d!==null&&d<=3;}).length;
+  document.getElementById('stat-total').textContent=todos.length;
+  document.getElementById('stat-pending').textContent=todos.filter(t=>!t.done).length;
+  document.getElementById('stat-done').textContent=todos.filter(t=>t.done).length;
+  document.getElementById('stat-urgent').textContent=urgentCount;
+  if(!filtered.length){list.innerHTML=`<div class="empty"><i class="ti ti-checkbox"></i>${todos.length===0?'還沒有待辦事項<br>從上方新增':'沒有符合的事項'}</div>`;return;}
+  filtered.sort((a,b)=>{
+    if(a.done!==b.done)return a.done?1:-1;
+    if(!a.date&&b.date)return 1;if(a.date&&!b.date)return-1;
+    if(a.date&&b.date)return new Date(a.date)-new Date(b.date);
+    return 0;
+  });
+  list.innerHTML=filtered.map(t=>`
+    <div class="todo-item" data-id="${t.id}">
+      <div class="todo-check ${t.done?'done':''}" onclick="toggleTodo(${t.id})">
+        ${t.done?'<i class="ti ti-check"></i>':''}
+      </div>
+      <div style="flex:1">
+        <div class="todo-text ${t.done?'done':''}">${t.text}</div>
+        <div class="todo-meta">
+          ${t.person?`<i class="ti ti-user" style="font-size:11px"></i> ${t.person}`:''}
+          ${t.date?`<i class="ti ti-calendar" style="font-size:11px"></i> ${t.date}${t.time?' '+t.time:''}`:''}
+          ${urgencyBadge(t)}
+        </div>
+      </div>
+      <div style="display:flex;gap:4px">
+        ${isMeetingTodo(t.text)?`<button class="icon-btn" onclick="generateMeetingPrep(${t.id})" title="會議準備清單" style="color:var(--purple)"><i class="ti ti-clipboard-list"></i></button>`:''}
+        <button class="icon-btn" onclick="editTodo(${t.id})" title="編輯" style="color:var(--info)"><i class="ti ti-pencil"></i></button>
+        <button class="icon-btn" onclick="downloadICS(${t.id})" title="加入Outlook"><i class="ti ti-calendar-plus"></i></button>
+        <button class="icon-btn del" onclick="deleteTodo(${t.id})"><i class="ti ti-trash"></i></button>
+      </div>
+    </div>`).join('');
+}
+
+// ── ICS ──────────────────────────────────────────
+function downloadICS(id){
+  const todo=todos.find(t=>t.id==id);if(!todo)return;
+  const title=encodeURIComponent(todo.text);
+  const desc=encodeURIComponent('負責人：'+(todo.person||'未指定')+' | 由鈞曜科技AI秘書建立');
+  let startdt='',enddt='';
+  if(todo.date){
+    const d=todo.date;
+    const t=todo.time||'09:00';
+    const tEnd=todo.time?(String(parseInt(t.split(':')[0])+1).padStart(2,'0')+':'+t.split(':')[1]):'10:00';
+    startdt=d+'T'+t+':00';
+    enddt=d+'T'+tEnd+':00';
+  }else{
+    const today=new Date().toISOString().slice(0,10);
+    startdt=today+'T09:00:00';
+    enddt=today+'T10:00:00';
+  }
+  const url=`https://outlook.office.com/calendar/deeplink/compose?subject=${title}&body=${desc}&startdt=${startdt}&enddt=${enddt}&path=%2Fcalendar%2Faction%2Fcompose`;
+  window.open(url,'_blank');
+  showToast('✅ Outlook 行事曆已開啟，確認後點儲存！');
+}
+
+function addToOutlookWeb(id){
+  document.querySelector('[style*="fixed"][style*="z-index:999"]')?.remove();
+  const todo=todos.find(t=>t.id==id);if(!todo)return;
+  const title=encodeURIComponent(todo.text);
+  const desc=encodeURIComponent('負責人：'+(todo.person||'未指定')+' | 由鈞曜科技AI秘書建立');
+  let startdt='',enddt='';
+  if(todo.date){
+    const d=todo.date;
+    const t=todo.time||'09:00';
+    const tEnd=todo.time?(String(parseInt(t.split(':')[0])+1).padStart(2,'0')+':'+t.split(':')[1]):'10:00';
+    startdt=d+'T'+t+':00';
+    enddt=d+'T'+tEnd+':00';
+  }else{
+    const today=new Date().toISOString().slice(0,10);
+    startdt=today+'T09:00:00';
+    enddt=today+'T10:00:00';
+  }
+  const url=`https://outlook.office.com/calendar/deeplink/compose?subject=${title}&body=${desc}&startdt=${startdt}&enddt=${enddt}&path=%2Fcalendar%2Faction%2Fcompose`;
+  window.open(url,'_blank');
+  showToast('✅ 網頁版 Outlook 已開啟，確認後點儲存！');
+}
+
+function downloadICSFile(id){
+  document.querySelector('[style*="fixed"][style*="z-index:999"]')?.remove();
+  const todo=todos.find(t=>t.id==id);if(!todo)return;
+  const d=todo.date?todo.date.replace(/-/g,''):'';
+  let dtStart,dtEnd;
+  if(d&&todo.time){
+    const t=todo.time.replace(':','')+'00';
+    const endH=String(parseInt(todo.time.split(':')[0])+1).padStart(2,'0');
+    dtStart=d+'T'+t;dtEnd=d+'T'+endH+todo.time.split(':')[1]+'00';
+  }else if(d){dtStart=d;dtEnd=d;
+  }else{const today=new Date().toISOString().slice(0,10).replace(/-/g,'');dtStart=today;dtEnd=today;}
+  const isAllDay=!todo.time;
+  const dtLine=isAllDay?`DTSTART;VALUE=DATE:${dtStart}\r\nDTEND;VALUE=DATE:${dtEnd}`:`DTSTART:${dtStart}\r\nDTEND:${dtEnd}`;
+  const ics=`BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//鈞曜科技AI秘書//TW\r\nBEGIN:VEVENT\r\nUID:${Date.now()}@jyste.tw\r\n${dtLine}\r\nSUMMARY:${todo.text}\r\nDESCRIPTION:負責人：${todo.person||'未指定'}\r\nEND:VEVENT\r\nEND:VCALENDAR`;
+  const blob=new Blob([ics],{type:'text/calendar;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download=todo.text.substring(0,20)+'.ics';
+  document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
+  showToast('📅 已下載！用 Outlook 開啟即可匯入');
+}
+
+// ── History ───────────────────────────────────────
+function renderHistory(){
+  const list=document.getElementById('history-list');
+  if(!meetings.length){list.innerHTML='<div class="empty"><i class="ti ti-history"></i>還沒有會議記錄</div>';return;}
+  list.innerHTML=meetings.map(m=>`
+    <div class="history-item" onclick="openModal(${m.id})">
+      <div class="history-title">${m.title}</div>
+      ${m.refDocs&&m.refDocs.length?`<div style="font-size:11px;color:var(--purple);margin-top:2px;display:flex;align-items:center;gap:4px"><i class="ti ti-paperclip" style="font-size:11px"></i>${m.refDocs.join('、')}</div>`:''}
+      <div class="history-date"><i class="ti ti-calendar" style="font-size:12px"></i> ${m.date}</div>
+      <div class="history-preview">${m.content.substring(0,80)}...</div>
+    </div>`).join('');
+}
+
+function openModal(id){
+  const m=meetings.find(m=>m.id===id);if(!m)return;
+  document.getElementById('modal-title').textContent=m.title;
+  document.getElementById('modal-body').textContent=m.content;
+  // 顯示參考文件名稱（如有）
+  const refEl=document.getElementById('modal-ref-docs');
+  if(refEl){
+    if(m.refDocs&&m.refDocs.length){
+      refEl.innerHTML='<i class="ti ti-paperclip"></i> 本次參考文件：'+m.refDocs.join('、');
+      refEl.style.display='flex';
+    }else{
+      refEl.style.display='none';
+    }
+  }
+  document.getElementById('history-modal').classList.add('open');
+}
+function closeModal(){document.getElementById('history-modal').classList.remove('open');}
+
+// ── Utils ─────────────────────────────────────────
+function switchTab(tab){
+  const tabs=['morning','meeting','todo','history','idea'];
+  document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('active',tabs[i]===tab));
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  document.getElementById('tab-'+tab).classList.add('active');
+}
+
+// ── 語音播報（ElevenLabs 真人音色）──────────────────
+// ElevenLabs 雲端 TTS 設定
+localStorage.setItem('jyste_eleven_key','sk_b0fb14adb69339645b4e8276c6ccb0b12c4280648446a65d');
+const ELEVEN_VOICE_ID='21m00Tcm4TlvDq8ikWAM'; // Rachel（已確認支援中文）
+let isSpeaking=false;
+let currentAudio=null;
+let speakKeepAlive=null;
+let _currentTTSAudio=null; // ElevenLabs 目前播放的 Audio 物件
+
+function buildDailyBriefing(){
+  const now=new Date();
+  const weekdays=['日','一','二','三','四','五','六'];
+  const month=now.getMonth()+1;
+  const day=now.getDate();
+  const weekday=weekdays[now.getDay()];
+  const h=now.getHours();
+
+  const pending=todos.filter(t=>!t.done).length;
+  const urgent=todos.filter(t=>{
+    if(t.done||!t.date)return false;
+    const d=daysUntil(t.date);
+    return d!==null&&d<=3&&d>=0;
+  });
+  const overdue=todos.filter(t=>{
+    if(t.done||!t.date)return false;
+    return daysUntil(t.date)<0;
+  });
+
+  const morningOpeners=[
+    `bruce哥早安 今天${month}月${day}號星期${weekday} 幫你看一下今天的狀況`,
+    `早安 bruce哥 ${month}月${day}號星期${weekday} 新的一天開始了`,
+    `早安 bruce哥 今天${month}月${day}號星期${weekday} 來報告一下今天的重點`
+  ];
+  const afternoonOpeners=[
+    `bruce哥午安 ${month}月${day}號下午 幫你更新一下進度`,
+    `午安 bruce哥 ${month}月${day}號 看看下午有什麼要處理的`
+  ];
+  const eveningOpeners=[
+    `bruce哥辛苦了 ${month}月${day}號晚上 看看今天還有什麼沒處理的`,
+    `晚安 bruce哥 ${month}月${day}號 今天快結束了來做個收尾`
+  ];
+
+  let openers=h<12?morningOpeners:h<18?afternoonOpeners:eveningOpeners;
+  let text=openers[Math.floor(Math.random()*openers.length)];
+
+  if(overdue.length>0&&urgent.length>0){
+    text+=` 要提醒你 有${overdue.length}件事已經過期`;
+    if(overdue.length<=2) text+=` 是${overdue.map(t=>t.text).join('和')}`;
+    text+=` 另外還有${urgent.length}件快到期 請盡快安排處理`;
+  }else if(overdue.length>0){
+    text+=` 要提醒你 有${overdue.length}件事已經過了截止日期`;
+    if(overdue.length<=2) text+=` 是${overdue.map(t=>t.text).join('和')}`;
+    text+=` 請盡快處理`;
+  }else if(urgent.length>0){
+    text+=` 提醒你 有${urgent.length}件事快到期了`;
+    urgent.slice(0,2).forEach(t=>{
+      const d=daysUntil(t.date);
+      const when=d===0?'今天到期':d===1?'明天到期':'還有'+d+'天到期';
+      text+=` ${t.text}${when}`;
+    });
+    text+=` 記得安排時間處理`;
+  }else if(pending>0){
+    text+=` 目前還有${pending}件待辦事項 進度都在掌控中 繼續加油`;
+  }else{
+    const freeTexts=[
+      ` 目前沒有任何待辦事項 今天可以輕鬆一點`,
+      ` 今天的事情都清完了 難得清閒好好把握`,
+      ` 目前一切清空 保持這個好狀態`
+    ];
+    text+=freeTexts[Math.floor(Math.random()*freeTexts.length)];
+  }
+
+  const endings=[
+    ' 有任何需要隨時告訴我',
+    ' 今天也請多保重 有事找我',
+    ' 工作順利 有需要我隨時在',
+    ' 記得適時休息 有事直接說',
+    ' 今天累了吧 有需要隨時來找我'
+  ];
+  text+=endings[Math.floor(Math.random()*endings.length)];
+
+  return text;
+}
+
+function speakEveningBriefing(){
+  const now=new Date();
+  const weekdays=['日','一','二','三','四','五','六'];
+  const month=now.getMonth()+1;
+  const day=now.getDate();
+  const weekday=weekdays[now.getDay()];
+
+  const openers=[
+    `bruce哥辛苦了 今天${month}月${day}號星期${weekday} 來幫你做個收尾`,
+    `收工了 bruce哥 ${month}月${day}號星期${weekday} 幫你整理一下今天的狀況`,
+    `bruce哥今天辛苦了 來看看${month}月${day}號的成果`
+  ];
+  let text=openers[Math.floor(Math.random()*openers.length)];
+
+  // 今日完成事項
+  if(_completedToday.length>0){
+    text+=` 今天完成了${_completedToday.length}件事`;
+    if(_completedToday.length<=3){
+      text+=` 包括${_completedToday.map(t=>t.text).join('、')}`;
+    }
+    text+=' 很不錯';
+  }else{
+    text+=' 今天沒有從這裡完成待辦事項';
+  }
+
+  // 剩餘未完成
+  const pending=todos.filter(t=>!t.done);
+  const overdue=pending.filter(t=>{ if(!t.date)return false; return daysUntil(t.date)<0; });
+  const urgent=pending.filter(t=>{ if(!t.date)return false; const d=daysUntil(t.date); return d!==null&&d>=0&&d<=3; });
+
+  if(overdue.length>0){
+    text+=` 另外提醒你 有${overdue.length}件事已經過了截止日期`;
+    if(overdue.length<=2) text+=` 是${overdue.map(t=>t.text).join('和')}`;
+    text+=' 明天記得優先處理';
+  }else if(urgent.length>0){
+    text+=` 還有${urgent.length}件事快到期了`;
+    urgent.slice(0,2).forEach(t=>{
+      const d=daysUntil(t.date);
+      const when=d===0?'今天到期':d===1?'明天到期':'還有'+d+'天';
+      text+=` ${t.text}${when}`;
+    });
+    text+=' 記得安排時間';
+  }else if(pending.length>0){
+    text+=` 還有${pending.length}件待辦 明天繼續加油`;
+  }else{
+    text+=' 今天的事情全部清完了 難得清閒 好好休息';
+  }
+
+  const endings=[
+    ' 好好休息 明天見',
+    ' 今天辛苦了 早點休息',
+    ' 明天見 bruce哥 好好休息',
+    ' 有需要明天再找我 先好好休息'
+  ];
+  text+=endings[Math.floor(Math.random()*endings.length)];
+
+  speakChain(text);
+}
+
+function autoSpeakIfFirstVisitToday(){
+  const today=new Date().toISOString().slice(0,10);
+  const lastVisit=localStorage.getItem('jyste_last_visit')||'';
+  if(lastVisit===today)return; // 今天已經播過了
+  localStorage.setItem('jyste_last_visit',today);
+  // 延遲 1.5 秒後播報（等頁面完全載入）
+  setTimeout(()=>{
+    startSpeak();
+  },1500);
+}
+
+function toggleSpeak(){
+  if(isSpeaking){
+    stopSpeak();
+  }else{
+    startSpeak();
+  }
+}
+
+async function startSpeak(){
+  const text=buildDailyBriefing();
+  document.getElementById('speak-text').style.display='block';
+  document.getElementById('speak-text').textContent=text;
+  isSpeaking=true;
+  isTTSSpeaking=true; // 每日簡報播報期間封鎖 recognition.onend
+  document.getElementById('speak-btn').style.background='#ef4444';
+  document.getElementById('speak-btn').innerHTML='<i class="ti ti-player-pause"></i> 播報中';
+
+  // 清除休眠計時器，避免朗讀中途被強制休眠
+  if(sleepTimeout){ clearTimeout(sleepTimeout); sleepTimeout=null; }
+  window.speechSynthesis.cancel();
+
+  const ttsText=preprocessTTS(text);
+  const speed=parseFloat(document.getElementById('voice-speed').value)||1.3;
+
+  function getVoice(){
+    const v=window.speechSynthesis.getVoices();
+    return v.find(x=>x.lang==='zh-TW')||v.find(x=>x.lang.startsWith('zh'))||null;
+  }
+
+  function doSpeak(){
+    const u=new SpeechSynthesisUtterance(ttsText);
+    u.lang='zh-TW';
+    u.rate=speed;
+    u.pitch=1.05;
+    const tw=getVoice();
+    if(tw)u.voice=tw;
+    // Chrome TTS 保活：避免長文被引擎中途截斷
+    if(speakKeepAlive)clearInterval(speakKeepAlive);
+    speakKeepAlive=setInterval(()=>{
+      if(!isSpeaking){clearInterval(speakKeepAlive);speakKeepAlive=null;return;}
+      window.speechSynthesis.pause();
+      window.speechSynthesis.resume();
+    },5000);
+    u.onend=()=>{
+      if(speakKeepAlive){clearInterval(speakKeepAlive);speakKeepAlive=null;}
+      isSpeaking=false;
+      document.getElementById('speak-btn').style.background='#22c55e';
+      document.getElementById('speak-btn').innerHTML='<i class="ti ti-player-play"></i> 播報';
+      // 每日簡報播完後重置語音控制狀態
+      isSpeaking=false;
+      isTTSSpeaking=false; // 解除封鎖
+      if(_processingGuard){clearTimeout(_processingGuard);_processingGuard=null;}
+      isProcessing=false;
+      if(isAwake&&voiceCtrlActive){
+        document.getElementById('voice-ctrl-status').textContent='刀疤已喚醒 請說指令 說「再見」結束對話';
+        if(sleepTimeout)clearTimeout(sleepTimeout);
+        sleepTimeout=setTimeout(()=>{setAwakeMode(false);speakFeedback('我先休息一下 需要的時候叫我');},30000);
+      }
+      if(voiceCtrlActive&&voiceCtrlRecognition){
+        setTimeout(()=>_restartMic(), 400);
+      }
+    };
+    u.onerror=u.onend;
+    window.speechSynthesis.speak(u);
+  }
+
+  if(window.speechSynthesis.getVoices().length===0){
+    window.speechSynthesis.onvoiceschanged=doSpeak;
+  }else{
+    doSpeak();
+  }
+}
+
+function fallbackSpeak(text){
+  startSpeak();
+}
+
+function stopSpeak(){
+  if(speakKeepAlive){clearInterval(speakKeepAlive);speakKeepAlive=null;}
+  window.speechSynthesis.cancel();
+  if(currentAudio){currentAudio.pause();currentAudio=null;}
+  if(_currentTTSAudio){_currentTTSAudio.pause();_currentTTSAudio=null;}
+  isSpeaking=false;
+  isTTSSpeaking=false;
+  isProcessing=false;
+  document.getElementById('speak-btn').style.background='#22c55e';
+  document.getElementById('speak-btn').innerHTML='<i class="ti ti-player-play"></i> 播報';
+}
+
+// ── 麥克風安全重啟：取代所有 try{recognition.start()}catch(e){} ─────
+function _restartMic(){
+  if(!voiceCtrlActive || !voiceCtrlRecognition) return;
+  if(isTTSSpeaking) return; // TTS 播放中，不搶音訊資源
+  try{
+    voiceCtrlRecognition.start();
+  }catch(e){
+    if(e.name === 'InvalidStateError'){
+      // 已在執行中，沒問題，忽略
+    }else{
+      // 辨識物件損壞，重新建立
+      console.warn('[刀疤] 麥克風重啟失敗，重新建立辨識物件：', e.name);
+      setTimeout(()=>{
+        if(!voiceCtrlActive) return;
+        const SR = window.SpeechRecognition||window.webkitSpeechRecognition;
+        voiceCtrlRecognition = new SR();
+        voiceCtrlRecognition.lang='zh-TW';
+        voiceCtrlRecognition.continuous=true;
+        voiceCtrlRecognition.interimResults=false;
+        setupRecognitionHandlers();
+        try{ voiceCtrlRecognition.start(); }catch(err){ console.warn('[刀疤] 重建後仍無法啟動麥克風：', err.name); }
+      }, 400);
+    }
+  }
+}
+
+// ── ElevenLabs 雲端 TTS 核心：呼叫 API 並播放音頻 ──────────
+// ElevenLabs 是否可用（連續失敗 3 次後停用 30 分鐘）
+function _isElevenAvailable(){
+  const saved=parseInt(localStorage.getItem('jyste_eleven_disabled_until')||'0');
+  if(saved>_elevenDisabledUntil)_elevenDisabledUntil=saved;
+  if(Date.now()<_elevenDisabledUntil)return false;
+  const key=localStorage.getItem('jyste_eleven_key')||'';
+  return !!key;
+}
+function _recordElevenFail(httpStatus){
+  // 401/403 = Key 失效，第一次就立即停用
+  if(httpStatus===401||httpStatus===403){
+    _elevenFailCount=99;
+  }else{
+    _elevenFailCount++;
+  }
+  if(_elevenFailCount>=3){
+    _elevenDisabledUntil=Date.now()+60*60*1000;
+    _elevenFailCount=0;
+    try{localStorage.setItem('jyste_eleven_disabled_until',String(_elevenDisabledUntil));}catch(e){}
+    console.warn('[刀疤] ElevenLabs 停用 1 小時，直接使用本機語音');
+  }
+}
+function _recordElevenSuccess(){
+  _elevenFailCount = 0;
+  _elevenDisabledUntil = 0;
+}
+
+async function _elevenTTS(text, genCheck, onEnd, onFail){
+  const key = localStorage.getItem('jyste_eleven_key')||'';
+  if(!key){ onFail(); return; }
+  try{
+    // 2 秒 fetch 超時（從 6 秒縮短）：401 應在 1 秒內回應，超過 2 秒視為網路異常
+    const controller = new AbortController();
+    const _fetchTimeout = setTimeout(()=>controller.abort(), 2000);
+    const resp = await fetch(
+      `https://api.elevenlabs.io/v1/text-to-speech/${ELEVEN_VOICE_ID}`,
+      { method:'POST',
+        headers:{'xi-api-key':key,'Content-Type':'application/json','Accept':'audio/mpeg'},
+        body:JSON.stringify({
+          text: preprocessTTS(text),
+          model_id:'eleven_turbo_v2_5',
+          voice_settings:{stability:0.5,similarity_boost:0.8,speed:1.1}
+        }),
+        signal: controller.signal
+      }
+    );
+    clearTimeout(_fetchTimeout);
+    if(!resp.ok){
+      const errMsg = `ElevenLabs HTTP ${resp.status}`;
+      console.warn('[刀疤] ElevenLabs 失敗：', errMsg);
+      throw new Error(errMsg);
+    }
+    const blob = await resp.blob();
+    if(!genCheck()){ return; }
+    const url = URL.createObjectURL(blob);
+    if(_currentTTSAudio){ _currentTTSAudio.pause(); _currentTTSAudio=null; }
+    const audio = new Audio(url);
+    _currentTTSAudio = audio;
+    audio.onended = ()=>{ URL.revokeObjectURL(url); if(_currentTTSAudio===audio)_currentTTSAudio=null; _recordElevenSuccess(); onEnd(); };
+    audio.onerror = ()=>{ URL.revokeObjectURL(url); if(_currentTTSAudio===audio)_currentTTSAudio=null; onEnd(); };
+    audio.play();
+  }catch(e){
+    console.warn('[刀疤] ElevenLabs TTS 例外：', e.message||e);
+    if(genCheck()) onFail();
+  }
+}
+
+
+// ── Google Translate TTS（免費，不需 API key，中文品質佳，通常 <1s 回應）──
+async function _googleTTS(text, genCheck, onEnd, onFail){
+  // _called 保證 onEnd/onFail 只會被呼叫一次，避免重複發聲
+  let _called=false, _tmo=null, _audio=null;
+  function _ok(){
+    if(_called)return; _called=true; clearTimeout(_tmo);
+    if(_currentTTSAudio===_audio)_currentTTSAudio=null;
+    onEnd();
+  }
+  function _fail(){
+    if(_called)return; _called=true; clearTimeout(_tmo);
+    if(_audio){try{_audio.pause();}catch(e){}}
+    if(_currentTTSAudio===_audio)_currentTTSAudio=null;
+    console.warn('[刀疤] Google TTS 失敗，切換 Chrome TTS');
+    if(genCheck()) onFail();
+  }
+  try{
+    const shortText = preprocessTTS(text).substring(0, 180);
+    if(!shortText || !genCheck()){ onFail(); return; }
+    const url = 'https://translate.google.com/translate_tts?ie=UTF-8&tl=zh-TW&client=tw-ob&q='
+              + encodeURIComponent(shortText);
+    if(_currentTTSAudio){ _currentTTSAudio.pause(); _currentTTSAudio=null; }
+    _audio = new Audio(url);
+    _currentTTSAudio = _audio;
+    _audio.onended = _ok;
+    _audio.onerror = _fail;
+    _tmo = setTimeout(_fail, 5000);
+    await _audio.play();
+  }catch(e){
+    console.warn('[刀疤] Google TTS 例外：', e.message||e);
+    _fail();
+  }
+}
+
+// ── Chrome TTS 備援：等待聲音清單載入後再朗讀 ─────────────────
+function _chromeTTSSpeak(text, onDone){
+  function _doSpeak(){
+    const voices = window.speechSynthesis.getVoices();
+    const u = new SpeechSynthesisUtterance(preprocessTTS(text));
+    u.lang='zh-TW'; u.rate=1.2; u.pitch=1.05;
+    const tw = voices.find(v=>v.lang==='zh-TW') || voices.find(v=>v.lang.startsWith('zh')) || null;
+    if(tw) u.voice=tw;
+
+    let _called = false;
+    let _keepalive = null;
+    function _once(){
+      if(_called) return; _called=true;
+      if(_keepalive){ clearInterval(_keepalive); _keepalive=null; }
+      onDone();
+    }
+
+    // 冷啟動守衛：10 秒內若 onstart 未觸發，代表 Chrome TTS 引擎卡死
+    const _coldGuard = setTimeout(()=>{
+      console.warn('[刀疤] Chrome TTS 冷啟動超時（10秒），強制取消並跳過');
+      window.speechSynthesis.cancel();
+      _once();
+    }, 10000);
+
+    u.onstart = ()=>{
+      clearTimeout(_coldGuard);
+      // Chrome 有 ~15 秒後自動停止的 bug，每 10 秒 pause/resume 保持引擎活躍
+      _keepalive = setInterval(()=>{
+        if(window.speechSynthesis.speaking){
+          window.speechSynthesis.pause();
+          window.speechSynthesis.resume();
+        }
+      }, 10000);
+    };
+    u.onend   = ()=>{ clearTimeout(_coldGuard); _once(); };
+    u.onerror = (e)=>{
+      // 'canceled' 是正常取消，其他才是真正錯誤
+      clearTimeout(_coldGuard);
+      _once();
+    };
+    window.speechSynthesis.speak(u);
+  }
+  // 若 voices 尚未載入，等待 voiceschanged；加 3 秒備用計時避免事件永不觸發
+  if(window.speechSynthesis.getVoices().length === 0){
+    let _vFired = false;
+    const _vTimeout = setTimeout(()=>{ if(!_vFired){ _vFired=true; _doSpeak(); } }, 3000);
+    window.speechSynthesis.addEventListener('voiceschanged', ()=>{
+      if(_vFired) return; _vFired=true; clearTimeout(_vTimeout); _doSpeak();
+    }, {once:true});
+  }else{
+    _doSpeak();
+  }
+}
+
+
+// ── 即時指令回饋音效（Web Audio API，無需任何 TTS 引擎）──────────
+function _playCommandBeep(){
+  try{
+    const ctx = new (window.AudioContext||window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(880, ctx.currentTime);
+    gain.gain.setValueAtTime(0.08, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.12);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.12);
+  }catch(e){}
+}
+
+// ── _warmupChromeTTS：頁面載入時預熱 Chrome TTS 引擎 ────────
+// 說一個靜音空格，讓 Chrome 完成引擎初始化，之後才不會有冷啟動延遲
+function _warmupChromeTTS(){
+  function _doWarmup(){
+    const voices = window.speechSynthesis.getVoices();
+    const u = new SpeechSynthesisUtterance('待命');
+    u.volume = 0; u.rate = 3; u.lang = 'zh-TW';
+    const tw = voices.find(v=>v.lang==='zh-TW') || voices.find(v=>v.lang.startsWith('zh')) || null;
+    if(tw) u.voice = tw;
+    u.onend = ()=>{}; u.onerror = ()=>{};
+    window.speechSynthesis.speak(u);
+    console.log('[刀疤] Chrome TTS 中文引擎預熱完成');
+  }
+  if(window.speechSynthesis.getVoices().length === 0){
+    window.speechSynthesis.addEventListener('voiceschanged', _doWarmup, {once:true});
+  } else {
+    setTimeout(_doWarmup, 100);
+  }
+}
+
+// ── speakFeedback：短句單次 TTS ─────────────────────────────
+function speakFeedback(text){
+  if(!isAwake && text !== '我先休息一下 需要的時候叫我') return;
+  _lastSpokenText = text;
+  _feedbackGen++;
+  const myGen = _feedbackGen;
+  // 停止目前所有音頻
+  if(_currentTTSAudio){ _currentTTSAudio.pause(); _currentTTSAudio=null; }
+  // 注意：不在這裡 cancel speechSynthesis，避免取消預熱暖機 utterance 導致 TTS 引擎重新冷啟動
+  // 若有正在播放的 keepalive 靜音字，讓它自然結束（<100ms），不影響使用者體驗
+  isTTSSpeaking = true;
+  _isTTSSpeakingSetAt = Date.now();
+  if(sleepTimeout){ clearTimeout(sleepTimeout); sleepTimeout=null; }
+  function _onEnd(){
+    if(_feedbackGen !== myGen) return;
+    isTTSSpeaking = false;
+    if(_processingGuard){ clearTimeout(_processingGuard); _processingGuard=null; }
+    isProcessing = false;
+    _restartMic(); // 統一用安全重啟函式
+    if(!isAwake) return;
+    if(sleepTimeout) clearTimeout(sleepTimeout);
+    // 朗讀進行中（speakChain）不設睡眠計時器，避免中途停止
+    if(!isTTSSpeaking){
+      const delay = (_ideaExchangeCount>0||_ideaListening) ? 120000 : 30000;
+      sleepTimeout = setTimeout(()=>{ setAwakeMode(false); speakFeedback('我先休息一下 需要的時候叫我'); }, delay);
+    }
+  }
+
+  // 12 秒安全守衛：強制解除卡住的 isTTSSpeaking 狀態
+  const _safeGuard = setTimeout(()=>{
+    if(_feedbackGen !== myGen) return;
+    console.warn('[刀疤] speakFeedback 安全守衛觸發，強制重置');
+    // 【關鍵】必須取消 Chrome TTS 排隊中的 utterance！
+    // 若不取消，Chrome TTS 可能在 10-20 秒後才播放，
+    // 此時麥克風已重啟，會把 TTS 聲音誤認成語音指令，導致語音功能故障
+    window.speechSynthesis.cancel();
+    _onEnd();        // 先清理狀態（此時 _feedbackGen===myGen，通過世代檢查）
+    _feedbackGen++;  // 再遞增，讓後續 Chrome TTS onend 不再重複呼叫 _onEnd
+  }, 12000);
+  const _onEndWithGuard = ()=>{ clearTimeout(_safeGuard); _onEnd(); };
+
+  // ElevenLabs 可用時才嘗試，連續失敗 3 次後直接用 Chrome TTS（省去等待時間）
+  function _tryGoogle(){ _googleTTS(text, ()=>_feedbackGen===myGen, _onEndWithGuard, ()=>{ if(_feedbackGen!==myGen)return; _chromeTTSSpeak(text, _onEndWithGuard); }); }
+  if(_isElevenAvailable()){
+    _elevenTTS(text, ()=>_feedbackGen===myGen, _onEndWithGuard, ()=>{
+      if(_feedbackGen !== myGen) return;
+      _recordElevenFail(_lastElevenStatus);
+      _tryGoogle();
+    });
+  } else {
+    _tryGoogle();
+  }
+}
+
+// ── _voiceChainDone：speakChain 播完後的清理 ─────────────────
+function _voiceChainDone(){
+  isTTSSpeaking = false;
+  isProcessing = false;
+  _ideaSending = false;
+  // 無論是否處於喚醒狀態，都要確保麥克風重啟（待機也需要繼續聆聽喚醒詞）
+  setTimeout(()=>_restartMic(), 400);
+  if(!isAwake) return;
+  document.getElementById('voice-ctrl-status').textContent='刀疤已喚醒 請說指令 說「再見」結束對話';
+  if(sleepTimeout) clearTimeout(sleepTimeout);
+  const delay = (_ideaExchangeCount>0||_ideaListening) ? 120000 : 60000;
+  sleepTimeout = setTimeout(()=>{
+    setAwakeMode(false);
+    speakFeedback('我先休息一下 需要的時候叫我');
+  }, delay);
+}
+
+// ── speakChain：長文 TTS（ElevenLabs 一次送完，Chrome 備援分句）──
+async function speakChain(text){
+  if(!text) return;
+  _lastSpokenText = text;
+  if(_speakChainKeepAlive){ clearInterval(_speakChainKeepAlive); _speakChainKeepAlive=null; }
+  if(_processingGuard){ clearTimeout(_processingGuard); _processingGuard=null; }
+  _speakChainGen++;
+  const myGen = _speakChainGen;
+  isTTSSpeaking = true;
+  _isTTSSpeakingSetAt = Date.now();
+  if(sleepTimeout){ clearTimeout(sleepTimeout); sleepTimeout=null; }
+  _feedbackGen++;
+  if(_currentTTSAudio){ _currentTTSAudio.pause(); _currentTTSAudio=null; }
+
+  // 看門狗：每句讀完後重設計時，避免被20秒看門狗誤殺
+  function _tickWatchdog(){ _isTTSSpeakingSetAt = Date.now(); }
+
+  // Google TTS 包裝成 Promise
+  function _googleTTSAsync(chunk){
+    return new Promise(resolve=>{
+      _googleTTS(chunk, ()=>_speakChainGen===myGen, ()=>resolve(true), ()=>resolve(false));
+    });
+  }
+
+  // Chrome TTS 包裝成 Promise（加60秒安全超時，避免 callback 遺失造成卡死）
+  function _chromeTTSAsync(chunk){
+    return new Promise(resolve=>{
+      let _resolved = false;
+      const _safeTimeout = setTimeout(()=>{
+        if(!_resolved){ _resolved=true; console.warn('[刀疤] _chromeTTSAsync 60秒超時，強制繼續'); resolve(true); }
+      }, 60000);
+      _chromeTTSSpeak(chunk, ()=>{
+        if(!_resolved){ _resolved=true; clearTimeout(_safeTimeout); resolve(true); }
+      });
+    });
+  }
+
+  // ElevenLabs 包裝成 Promise
+  function _elevenTTSAsync(){
+    return new Promise(resolve=>{
+      _elevenTTS(text, ()=>_speakChainGen===myGen, ()=>resolve(true), ()=>resolve(false));
+    });
+  }
+
+  // ElevenLabs 可用時先嘗試
+  if(_isElevenAvailable()){
+    const elevenOk = await _elevenTTSAsync();
+    if(_speakChainGen!==myGen) return;
+    if(elevenOk){ _voiceChainDone(); return; }
+    _recordElevenFail(_lastElevenStatus);
+  }
+
+  // 分句朗讀：用 for 迴圈 + await，邏輯清晰，不會有 callback 遺失問題
+  const chunks = text.split(/(?<=[。！？!?\n])/g).map(s=>s.trim()).filter(s=>s.length>0);
+  if(chunks.length===0){ _voiceChainDone(); return; }
+
+  for(let i=0; i<chunks.length; i++){
+    if(_speakChainGen!==myGen) return; // 被使用者語音指令「停」取消
+
+    const chunk = chunks[i];
+
+    // 先試 Google TTS
+    const googleOk = await _googleTTSAsync(chunk);
+    if(_speakChainGen!==myGen) return;
+
+    // Google 失敗則用 Chrome TTS
+    if(!googleOk){
+      await _chromeTTSAsync(chunk);
+      if(_speakChainGen!==myGen) return;
+    }
+
+    _tickWatchdog(); // 每句讀完，重設看門狗計時
+  }
+
+  // 全部讀完
+  if(_speakChainGen===myGen) _voiceChainDone();
+}
+
+
+// ── 語音控制（持續對話版）──────────────────────────
+let voiceCtrlActive=false;
+let voiceCtrlRecognition=null;
+let isAwake=false;          // 是否已喚醒進入對話模式
+let sleepTimeout=null;      // 30秒無動作自動休眠
+let isProcessing=false;     // 防止重複執行
+
+function toggleVoiceControl(){
+  if(voiceCtrlActive){
+    stopVoiceControl();
+  }else{
+    startVoiceControl();
+  }
+}
+
+function setAwakeMode(awake){
+  isAwake=awake;
+  if(awake){
+    // 喚醒狀態：綠色
+    document.getElementById('voice-ctrl-btn').style.background='#14532d';
+    document.getElementById('voice-ctrl-btn').style.borderColor='#22c55e';
+    document.getElementById('voice-ctrl-btn').style.color='#22c55e';
+    document.getElementById('voice-ctrl-status').textContent='小秘已喚醒 請說指令 說「再見」結束對話';
+    // 沒有任務進行中才啟動計時；有任務時等任務完成後再計時
+    if(sleepTimeout)clearTimeout(sleepTimeout);
+    if(!isProcessing && !isTTSSpeaking){
+      // 朗讀中（speakChain）不設睡眠計時器
+      sleepTimeout=setTimeout(()=>{
+        setAwakeMode(false);
+        speakFeedback('我先休息一下 需要的時候叫我');
+      },60000);
+    }
+  }else{
+    // 待機狀態：藍色
+    document.getElementById('voice-ctrl-btn').style.background='#1e3a5f';
+    document.getElementById('voice-ctrl-btn').style.borderColor='#3b82f6';
+    document.getElementById('voice-ctrl-btn').style.color='#93c5fd';
+    document.getElementById('voice-ctrl-status').textContent='語音控制已開啟 說「刀疤」喚醒我';
+    document.getElementById('voice-ctrl-result').textContent='';
+    if(sleepTimeout)clearTimeout(sleepTimeout);
+  }
+}
+
+function startVoiceControl(){
+  if(!('webkitSpeechRecognition' in window)&&!('SpeechRecognition' in window)){
+    showToast('請使用 Chrome 瀏覽器才能使用語音控制');
+    return;
+  }
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  voiceCtrlRecognition=new SR();
+  voiceCtrlRecognition.lang='zh-TW';
+  voiceCtrlRecognition.continuous=true;
+  voiceCtrlRecognition.interimResults=false; // 只取最終結果，更準確
+
+  voiceCtrlRecognition.onstart=()=>{
+    voiceCtrlActive=true;
+    document.getElementById('voice-ctrl-btn').style.background='#1e3a5f';
+    document.getElementById('voice-ctrl-btn').style.borderColor='#3b82f6';
+    document.getElementById('voice-ctrl-btn').style.color='#93c5fd';
+    document.getElementById('voice-ctrl-bar').style.display='flex';
+    document.getElementById('voice-ctrl-status').textContent='語音控制已開啟 說「刀疤」喚醒我';
+    document.getElementById('voice-ctrl-result').textContent='';
+  };
+
+  setupRecognitionHandlers();
+  voiceCtrlRecognition.start();
+
+  // 語音控制啟動時立即預熱 Chrome TTS 引擎（確保第一句回覆不會冷啟動）
+  _warmupChromeTTS();
+
+  // Chrome TTS 引擎保活：每 30s 說一個靜音字，真正讓引擎維持在熱身狀態
+  // （resume() 對未暫停的引擎無效，必須實際 speak() 才能防止冷啟動）
+  if(_ttsEngineKeepAlive) clearInterval(_ttsEngineKeepAlive);
+  _ttsEngineKeepAlive = setInterval(()=>{
+    if(voiceCtrlActive && !isTTSSpeaking && !window.speechSynthesis.speaking){
+      const u = new SpeechSynthesisUtterance('待命');
+      u.volume = 0; u.rate = 3; u.lang = 'zh-TW';
+      u.onend = ()=>{}; u.onerror = ()=>{};
+      window.speechSynthesis.speak(u);
+    }
+  }, 10000);
+
+  // ── 全域看門狗：每 5 秒檢查 isTTSSpeaking 是否卡死超過 20 秒 ─────
+  // （任何其他守衛都漏網的情況，這是最後防線）
+  const _watchdog = setInterval(()=>{
+    if(!voiceCtrlActive){ clearInterval(_watchdog); return; }
+    if(isTTSSpeaking && _isTTSSpeakingSetAt > 0 && Date.now()-_isTTSSpeakingSetAt > 45000){
+      console.warn('[刀疤] 全域看門狗觸發：isTTSSpeaking 卡死超過 20 秒，強制重置所有狀態');
+      // 強制停止所有音頻
+      if(_currentTTSAudio){ _currentTTSAudio.pause(); _currentTTSAudio=null; }
+      window.speechSynthesis.cancel();
+      // 遞增世代，廢棄所有進行中的 TTS 回調
+      _feedbackGen++;
+      _speakChainGen++;
+      if(_speakChainKeepAlive){ clearInterval(_speakChainKeepAlive); _speakChainKeepAlive=null; }
+      // 重置所有狀態
+      isTTSSpeaking = false;
+      isProcessing = false;
+      if(_processingGuard){ clearTimeout(_processingGuard); _processingGuard=null; }
+      // 重啟麥克風
+      _restartMic();
+      // 更新 UI
+      if(isAwake){
+        document.getElementById('voice-ctrl-status').textContent='刀疤已喚醒 請說指令 說「再見」結束對話';
+        if(sleepTimeout) clearTimeout(sleepTimeout);
+        sleepTimeout = setTimeout(()=>{ setAwakeMode(false); speakFeedback('我先休息一下 需要的時候叫我'); }, 30000);
+      }
+    }
+  }, 5000);
+  // 看門狗 ID 存入全域，stopVoiceControl 時清除
+  _voiceWatchdog = _watchdog;
+}
+
+function stopVoiceControl(){
+  voiceCtrlActive=false;
+  isAwake=false;
+  isProcessing=false;
+  if(sleepTimeout)clearTimeout(sleepTimeout);
+  if(_ttsEngineKeepAlive){clearInterval(_ttsEngineKeepAlive);_ttsEngineKeepAlive=null;}
+  if(_voiceWatchdog){clearInterval(_voiceWatchdog);_voiceWatchdog=null;}
+  if(voiceCtrlRecognition)voiceCtrlRecognition.stop();
+  document.getElementById('voice-ctrl-btn').style.background='';
+  document.getElementById('voice-ctrl-btn').style.borderColor='';
+  document.getElementById('voice-ctrl-btn').style.color='var(--text2)';
+  document.getElementById('voice-ctrl-bar').style.display='none';
+  showToast('語音控制已關閉');
+}
+
+// ── 語音新增待辦 ──────────────────────────────────
+let voicePendingAdd=false;      // 等待用戶說出事項內容
+let voicePendingConfirm=null;   // 等待確認的待辦資料
+let voiceCooldown=false;        // 冷卻期，防止取消後誤觸發
+
+function clearVoicePending(){
+  voicePendingConfirm=null;
+  voicePendingAdd=false;
+  isProcessing=false;
+  // 設定 2 秒冷卻期，期間忽略所有語音輸入
+  voiceCooldown=true;
+  setTimeout(()=>{voiceCooldown=false;},2000);
+}
+
+// 解析時間詞
+function parseVoiceDate(text){
+  const now=new Date();
+  const pad=n=>String(n).padStart(2,'0');
+  const fmt=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+  const weekdays=['日','一','二','三','四','五','六'];
+
+  if(text.includes('今天')) return fmt(now);
+  if(text.includes('明天')){const d=new Date(now);d.setDate(d.getDate()+1);return fmt(d);}
+  if(text.includes('後天')){const d=new Date(now);d.setDate(d.getDate()+2);return fmt(d);}
+  if(text.includes('大後天')){const d=new Date(now);d.setDate(d.getDate()+3);return fmt(d);}
+  if(text.includes('月底')){const d=new Date(now.getFullYear(),now.getMonth()+1,0);return fmt(d);}
+
+  // 下週幾
+  const nextWeek=text.match(/下週([一二三四五六日])|下星期([一二三四五六日])/);
+  if(nextWeek){
+    const day=nextWeek[1]||nextWeek[2];
+    const target=weekdays.indexOf(day);
+    if(target>=0){
+      const d=new Date(now);
+      const today=now.getDay();
+      const daysToNextMonday=((8-today)%7)||7;
+      const offsetFromMonday=target===0?6:target-1;
+      d.setDate(d.getDate()+daysToNextMonday+offsetFromMonday);
+      return fmt(d);
+    }
+  }
+  // 這週幾
+  const thisWeek=text.match(/這週([一二三四五六日])|這星期([一二三四五六日])|星期([一二三四五六日])/);
+  if(thisWeek){
+    const day=thisWeek[1]||thisWeek[2]||thisWeek[3];
+    const target=weekdays.indexOf(day);
+    if(target>=0){
+      const d=new Date(now);
+      let diff=(target-now.getDay()+7)%7;
+      if(diff===0)diff=7;
+      d.setDate(d.getDate()+diff);
+      return fmt(d);
+    }
+  }
+  // X月X號 或 X月X（不一定有號或日）
+  const dateMatch=text.match(/(\d{1,2})月(\d{1,2})[號日]?/);
+  if(dateMatch){
+    const m=parseInt(dateMatch[1])-1;
+    const d=parseInt(dateMatch[2]);
+    const year=now.getFullYear();
+    const pad=n=>String(n).padStart(2,'0');
+    const date=new Date(year,m,d);
+    if(date<now)date.setFullYear(year+1);
+    return `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())}`;
+  }
+  return '';
+}
+
+// 把日期格式轉為口語
+function dateToSpeech(dateStr){
+  if(!dateStr)return '';
+  const d=new Date(dateStr+'T00:00:00');
+  const weekdays=['日','一','二','三','四','五','六'];
+  const now=new Date();
+  const diff=Math.round((d-now)/(1000*60*60*24));
+  const base=`${d.getMonth()+1}月${d.getDate()}號`;
+  if(diff===0)return `今天 ${base}`;
+  if(diff===1)return `明天 ${base}`;
+  if(diff===2)return `後天 ${base}`;
+  return `${base} 星期${weekdays[d.getDay()]}`;
+}
+
+function voiceAddTodo(taskRaw){
+  // 用 AI 解析內容和時間
+  const date=parseVoiceDate(taskRaw);
+  // 移除時間詞，保留純事項文字
+  const task=taskRaw
+    .replace(/今天|明天|後天|大後天|月底|下週[一二三四五六日]|下星期[一二三四五六日]|這週[一二三四五六日]|這星期[一二三四五六日]|星期[一二三四五六日]|\d{1,2}月\d{1,2}[號日]?|之前|之內|前/g,'')
+    .replace(/\s+/g,' ').trim();
+
+  // 儲存待確認的資料
+  voicePendingConfirm={text:task, date:date};
+
+  // 朗讀確認
+  let msg=`bruce哥 我幫你整理一下 事項是 ${task}`;
+  if(date) msg+=` 日期是 ${dateToSpeech(date)}`;
+  else msg+=` 沒有設定日期`;
+  msg+=` 這樣對嗎 說確認來新增 說取消來放棄`;
+
+  speakFeedback(msg);
+  document.getElementById('voice-ctrl-status').textContent=`待確認：${task}${date?' | '+date:''}`;
+}
+
+let _processingGuard=null;
+function resetProcessingState(){
+  isProcessing=false;
+  if(_processingGuard){clearTimeout(_processingGuard);_processingGuard=null;}
+  if(isAwake&&voiceCtrlActive){
+    document.getElementById('voice-ctrl-status').textContent='刀疤已喚醒 請說指令 說「再見」結束對話';
+  }
+  _restartMic();
+}
+
+function executeVoiceCommand(cmd){
+  _playCommandBeep(); // 即時聲音回饋，讓使用者知道指令已收到
+  document.getElementById('voice-ctrl-status').textContent='執行中：'+cmd;
+  if(_processingGuard)clearTimeout(_processingGuard);
+  _processingGuard=setTimeout(resetProcessingState,12000); // 一般指令12秒安全護衛
+  // 清除休眠計時器，避免指令執行中途被強制進入休眠
+  if(sleepTimeout){clearTimeout(sleepTimeout);sleepTimeout=null;}
+
+  // ── 待辦新增：等待用戶說出事項內容 ──────────────────────────
+  if(voicePendingAdd){
+    voicePendingAdd=false;
+    if(_processingGuard){clearTimeout(_processingGuard);_processingGuard=null;}
+    voiceAddTodo(cmd);
+    return;
+  }
+
+  // ── 待辦新增：等待用戶說「確認」或「取消」─────────────────────
+  if(voicePendingConfirm){
+    if(['確認','對','沒錯','是的','好','OK','ok'].some(w=>cmd.includes(w))){
+      if(_processingGuard){clearTimeout(_processingGuard);_processingGuard=null;}
+      const {text,date}=voicePendingConfirm;
+      voicePendingConfirm=null; // 直接清除，不設冷卻期，避免擋住後續指令
+      voicePendingAdd=false;
+      switchTab('todo');
+      const newTodo={id:Date.now(),text,person:'',date:date||'',time:'',done:false};
+      todos.push(newTodo);
+      sbInsert('todos',newTodo).catch(()=>{});
+      saveData();renderTodos();updateMorningStats();checkReminders();
+      speakFeedback('好的 已新增 '+text+(date?' 日期'+dateToSpeech(date):''));
+      return;
+    } else if(['取消','算了','不要','不用了','不對'].some(w=>cmd.includes(w))){
+      if(_processingGuard){clearTimeout(_processingGuard);_processingGuard=null;}
+      voicePendingConfirm=null; // 直接清除，不設冷卻期
+      voicePendingAdd=false;
+      // 給 Chrome 150ms 緩衝，避免剛做過 cancel() 後馬上 speak() 衝突
+      setTimeout(()=>speakFeedback('好的 已取消'), 150);
+      return;
+    }
+  }
+
+  // ── 創意討論室等待模式：下一句直接送進討論室 ──────────────────
+  if(_ideaListening){
+    _ideaListening=false;
+    // 清除12秒護衛計時器，交給 speakChain/_voiceChainDone 管理狀態
+    if(_processingGuard){clearTimeout(_processingGuard);_processingGuard=null;}
+    switchTab('idea');
+    const input=document.getElementById('idea-chat-input');
+    if(input){ input.value=cmd; sendIdeaMessage(); }
+    return;
+  }
+
+  // ── 創意討論進行中：除特定指令外，所有語音都繼續送進討論室 ────
+  const _ideaExitCmds=['再見','掰掰','結束','整理想法','整理成簡報','整理簡報','幫我整理',
+                        '下載簡報','產出簡報','做成簡報','收工','休息','暫停'];
+  if(_ideaExchangeCount > 0 && !_ideaExitCmds.some(w=>cmd.includes(w))){
+    // 清除12秒護衛計時器，交給 speakChain/_voiceChainDone 管理狀態
+    if(_processingGuard){clearTimeout(_processingGuard);_processingGuard=null;}
+    const input=document.getElementById('idea-chat-input');
+    if(input){ input.value=cmd; sendIdeaMessage(); }
+    return;
+  }
+
+  // ── 友善互動：打招呼 / 感謝 ──────────────────────────────────
+  if(['謝謝','謝了','感謝','辛苦了','多謝','謝你'].some(w=>cmd.includes(w))){
+    const r=['不客氣 bruce哥 有需要隨時說','這是我應該做的 有事盡管交給我','bruce哥太客氣了 我在這'];
+    speakFeedback(r[Math.floor(Math.random()*r.length)]);
+  }
+  else if(['你好','哈囉','嗨','早安','午安','晚安','在嗎','在不在','有空嗎'].some(w=>cmd.includes(w))){
+    const h=new Date().getHours();
+    const g=h<12?'早安':h<17?'午安':'晚安';
+    const r=[`${g} bruce哥 我在 有什麼需要幫忙的`,`${g} 我在這 請說`,`嗨 bruce哥 ${g} 有什麼事`];
+    speakFeedback(r[Math.floor(Math.random()*r.length)]);
+  }
+
+  // ── 重複最後一句 ──────────────────────────────────────────────
+  else if(['重複','再說一次','再說','沒聽到','什麼','你說什麼','聽不清楚'].some(w=>cmd.includes(w))){
+    if(_lastSpokenText){
+      speakFeedback(_lastSpokenText);
+    }else{
+      speakFeedback('剛才我還沒說任何話');
+    }
+  }
+
+  // ── 停止播報（放在新聞/簡報前，避免「停止播報」誤觸新聞）──────
+  else if(['停止','停下','可以了','不用了','結束播報','好了','夠了','不要說了'].some(w=>cmd.includes(w))
+    &&!['分析','新增','待辦','新聞','記錄'].some(w=>cmd.includes(w))){
+    stopSpeak();
+    speakFeedback('好 停了');
+  }
+
+  // ── 每日簡報 ──────────────────────────────────────────────────
+  else if(['簡報','播報','晨報','今天狀況','今天情況','日報','早報','早安報告','今天怎樣','今天概況','今天重點','幫我報告','報告一下'].some(w=>cmd.includes(w))){
+    switchTab('morning');
+    // 簡報有自己的 onend 處理，不需要安全護衛
+    setTimeout(()=>{
+      startSpeak();
+      if(_processingGuard){clearTimeout(_processingGuard);_processingGuard=null;}
+    },300);
+  }
+
+  // ── 新聞（先判斷，避免「有什麼事」誤觸）─────────────────────
+  else if(['新聞','消息','時事','今日新聞','載入新聞','看新聞','最新消息','大事','新鮮事','有什麼新聞','今天新聞'].some(w=>cmd.includes(w))){
+    switchTab('morning');
+    setTimeout(()=>loadNews(true),300);
+    speakFeedback('好的 幫你載入今日新聞 載完後會朗讀標題');
+  }
+
+  // ── 天氣查詢 ──────────────────────────────────────────────────
+  else if(['天氣','幾度','下雨','帶傘','冷不冷','熱不熱','外面冷','外面熱','紫外線','溫度','氣溫'].some(w=>cmd.includes(w))){
+    const cities=['台北','台中','高雄','台南','桃園','新竹','苗栗','彰化','南投','嘉義','屏東','花蓮','宜蘭','基隆','台東','澎湖'];
+    const city=cities.find(c=>cmd.includes(c))||document.getElementById('weather-city').value.trim()||'';
+    const day=cmd.includes('明天')?1:0;
+    switchTab('morning');
+    // 不用語音確認，直接查詢，避免與 speakChain 競速造成延遲或中途停頓
+    document.getElementById('voice-ctrl-status').textContent = city ? `查詢${city}天氣中...` : '查詢天氣中...';
+    if(_processingGuard){clearTimeout(_processingGuard);_processingGuard=null;}
+    loadWeather(city,day,true);
+  }
+
+  // ── 指定第X條分析（支援：條/則/個，中文數字/阿拉伯數字1-8，多種說法）─
+  else if(/第[一二三四五六七八1-8][條則個]/.test(cmd)||
+    /我對第[一二三四五六七八1-8]/.test(cmd)||
+    /幫我分析第[一二三四五六七八1-8]/.test(cmd)||
+    /聽第[一二三四五六七八1-8]/.test(cmd)){
+    const numMap={'一':1,'二':2,'三':3,'四':4,'五':5,'六':6,'七':7,'八':8,
+      '1':1,'2':2,'3':3,'4':4,'5':5,'6':6,'7':7,'8':8};
+    const m=cmd.match(/第([一二三四五六七八1-8])/);
+    const idx=(numMap[m[1]]||1)-1;
+    const news=_voiceNewsItems[idx];
+    if(!news){
+      speakFeedback(_voiceNewsItems.length===0
+        ?'請先說「載入新聞」再選要分析哪條'
+        :'找不到這則 新聞只有'+_voiceNewsItems.length+'條');
+    }else if(!apiKey){
+      speakFeedback('分析功能需要先設定 API Key');
+    }else{
+      // 深度分析可能需要較長時間，護衛設30秒
+      if(_processingGuard){clearTimeout(_processingGuard);_processingGuard=null;}
+      _processingGuard=setTimeout(resetProcessingState,30000);
+      // 先切換到晨報頁面，讓使用者看到分析結果
+      switchTab('morning');
+      speakFeedback('好的 正在對第'+m[1]+'條進行深度分析 請稍等');
+      // 使用與畫面「AI 深度分析」相同的完整 prompt
+      callGemini(`你是鈞曜科技（台灣物料管理設備製造商，產品：垂直式/旋轉式自動倉儲）總經理的AI秘書。請針對以下新聞進行深度分析，用繁體中文回覆：
+
+新聞來源：${news.source||''}
+新聞標題：${news.title}
+
+【新聞概要】用3句話說明主要內容。
+【對產業的影響】說明對台灣製造業、自動化產業的影響。
+【對鈞曜科技的意義】具體說明商機、風險或注意事項。
+【行動建議】給出1～2個具體可行的建議。`)
+        .then(res=>{
+          // 同步更新畫面上的新聞詳情區塊
+          const detailEl=document.getElementById('news-detail-'+idx);
+          if(detailEl){
+            detailEl.style.display='block';
+            detailEl.innerHTML=res.replace(/\n/g,'<br>');
+            detailEl.scrollIntoView({behavior:'smooth',block:'center'});
+          }
+          // 整理成 TTS 用的純文字（去掉標記符號、換行轉逗號）
+          const ttsText=res
+            .replace(/【([^】]+)】/g,'$1，')
+            .replace(/[*#\n]+/g,' ')
+            .trim()
+            .slice(0,700);
+          speakChain(ttsText);
+        })
+        .catch(()=>speakFeedback('深度分析失敗 請稍後再試'));
+    }
+  }
+
+  // ── 說了「分析」但沒指定第幾條 ───────────────────────────────
+  else if(cmd.includes('分析')){
+    if(_voiceNewsItems.length===0){
+      speakFeedback('請先說「載入新聞」再選要分析哪條');
+    }else{
+      speakFeedback('請說第幾條 例如 第一條 或 第二條');
+    }
+  }
+
+  // ── 待辦查詢（確認不含「新增」關鍵字）───────────────────────
+  else if(['待辦','有什麼事','工作清單','任務','事項','代辦','待辨','今天要做','有幾件','還有幾件','有幾個'].some(w=>cmd.includes(w))
+    &&!['新增','加入','幫我加','幫我記','記下'].some(w=>cmd.includes(w))){
+    switchTab('todo');
+    const pending=todos.filter(t=>!t.done);
+    if(pending.length===0){
+      speakFeedback('太棒了 目前沒有待辦 bruce哥可以輕鬆一下');
+    }else{
+      // 計算三日內的待辦（今天/明天/後天）
+      const todayD=new Date(); todayD.setHours(0,0,0,0);
+      const fmt3=(d)=>{
+        const diff=Math.round((d-todayD)/(86400000));
+        if(diff===0)return'今天';
+        if(diff===1)return'明天';
+        if(diff===2)return'後天';
+        return(d.getMonth()+1)+'月'+d.getDate()+'日';
+      };
+      const upcoming=pending
+        .filter(t=>t.date)
+        .map(t=>({...t,_d:new Date(t.date+'T00:00:00')}))
+        .filter(t=>{ const diff=Math.round((t._d-todayD)/86400000); return diff>=0&&diff<=2; })
+        .sort((a,b)=>a._d-b._d);
+      const noDate=pending.filter(t=>!t.date);
+      if(upcoming.length===0&&noDate.length===0){
+        speakFeedback('目前有'+pending.length+'件待辦 但三日內沒有指定日期的事項 已切換到待辦頁面');
+      }else{
+        let parts=[];
+        if(upcoming.length>0){
+          parts.push('三日內有'+upcoming.length+'件：'+upcoming.map(t=>fmt3(t._d)+'要'+t.text).join('，'));
+        }
+        if(noDate.length>0){
+          parts.push('另有'+noDate.length+'件未設定日期：'+noDate.slice(0,3).map(t=>t.text).join('，')+(noDate.length>3?'等':''));
+        }
+        speakChain('目前共有'+pending.length+'件待辦。'+parts.join('。'));
+      }
+    }
+  }
+
+  // ── 會議記錄（確認不含「新增」）─────────────────────────────
+  else if(['開會','會議','紀錄','會議記錄','會議紀錄','開會記錄','會議筆記'].some(w=>cmd.includes(w))
+    &&!['新增','加'].some(w=>cmd.includes(w))){
+    switchTab('meeting');
+    speakFeedback('好的 已切換到會議記錄');
+  }
+
+  // ── 新增待辦 ──────────────────────────────────────────────────
+  else if(['新增','加入','幫我加','幫我記','記下','加待辦','新增待辦','記一下','提醒我'].some(w=>cmd.includes(w))){
+    const taskRaw=cmd.replace(/新增|加入|加|幫我加|幫我記|記下|待辦|事項|記一下|提醒我/g,'').trim();
+    if(taskRaw.length>1){
+      voiceAddTodo(taskRaw);
+    }else{
+      voicePendingAdd=true;
+      speakFeedback('好的 請說出要新增的待辦事項');
+    }
+  }
+
+  // ── 晚間收尾簡報 ──────────────────────────────────────────────
+  else if(['今天怎麼樣','今天如何','今天結束','下班了','下班','收工','晚安','晚間簡報','今天回顧','工作回顧','今天總結'].some(w=>cmd.includes(w))){
+    if(_processingGuard){clearTimeout(_processingGuard);_processingGuard=null;}
+    _processingGuard=setTimeout(resetProcessingState,25000);
+    speakEveningBriefing();
+  }
+
+  // ── 歷史記錄 ──────────────────────────────────────────────────
+  else if(['歷史','歷史記錄','過去','之前的記錄','舊記錄'].some(w=>cmd.includes(w))){
+    switchTab('meeting');
+    speakFeedback('好的 已切換到會議記錄 歷史記錄在頁面下方');
+  }
+
+  // ── 創意討論室 ──────────────────────────────────────────────────
+  else if(['我有個想法','有個想法','我有個點子','有個點子','我有個創意','有個創意','記錄想法','記錄創意','新想法','新創意'].some(w=>cmd.includes(w))){
+    switchTab('idea');
+    const triggers=['我有個想法','有個想法','我有個點子','有個點子','我有個創意','有個創意','記錄想法','記錄創意','新想法','新創意'];
+    let ideaText=cmd;
+    triggers.forEach(t=>{ideaText=ideaText.replace(t,'');});
+    ideaText=ideaText.trim();
+    if(ideaText){
+      document.getElementById('idea-chat-input').value=ideaText;
+      speakFeedback('好的 我聽到了 我們一起來討論');
+      setTimeout(()=>sendIdeaMessage(),600);
+    }else{
+      _ideaListening=true; // 下一句語音直接送進討論室
+      setIdeaStatus('請說出你的想法，刀疤在聽...','ti-microphone-2');
+      speakFeedback('好的 請說出你的想法 我在聽');
+    }
+  }
+
+  // ── 整理想法 / 下載簡報 ──────────────────────────────────────
+  else if(['整理想法','整理成簡報','整理簡報','幫我整理'].some(w=>cmd.includes(w))){
+    if(_ideaExchangeCount>=1){ finalizeIdea(); speakFeedback('好的 幫你整理成簡報大綱'); }
+    else{ switchTab('idea'); speakFeedback('請先跟我說說你的想法 我們討論一下再整理'); }
+  }
+  else if(['下載簡報','產出簡報','做成簡報','生成簡報','產生簡報'].some(w=>cmd.includes(w))){
+    if(_ideaSlides){ downloadIdeaPPTX(); speakFeedback('好的 幫你下載簡報'); }
+    else{ switchTab('idea'); speakFeedback('請先跟我討論想法 整理完成後就可以下載簡報'); }
+  }
+
+  // ── 再見 / 結束對話 ───────────────────────────────────────────
+  else if(['再見','掰掰','拜拜','結束對話','掰了','bye'].some(w=>cmd.includes(w))){
+    if(_processingGuard){clearTimeout(_processingGuard);_processingGuard=null;}
+    if(sleepTimeout){clearTimeout(sleepTimeout);sleepTimeout=null;}
+    const goodbyes=['好的 有需要再叫我 再見 bruce哥','掰掰 bruce哥 有事找我','好 我先待命 需要的時候叫我'];
+    const msg=goodbyes[Math.floor(Math.random()*goodbyes.length)];
+    setAwakeMode(false); // 先切換待機狀態
+    _feedbackGen++;
+    const myGen=_feedbackGen;
+    isTTSSpeaking=true;
+    // 8 秒安全守衛
+    const _byeGuard=setTimeout(()=>{
+      if(_feedbackGen!==myGen)return;
+      _feedbackGen++;
+      isTTSSpeaking=false; isProcessing=false;
+      _restartMic();
+    },8000);
+    function _onByeEnd(){
+      clearTimeout(_byeGuard);
+      if(_feedbackGen!==myGen)return;
+      isTTSSpeaking=false; isProcessing=false;
+      _restartMic();
+    }
+    // 優先 ElevenLabs，失敗備援 Chrome TTS
+    _elevenTTS(msg, ()=>_feedbackGen===myGen, _onByeEnd, ()=>{
+      if(_feedbackGen!==myGen)return;
+      if(_currentTTSAudio){_currentTTSAudio.pause();_currentTTSAudio=null;}
+      window.speechSynthesis.cancel();
+      const u=new SpeechSynthesisUtterance(preprocessTTS(msg));
+      u.lang='zh-TW'; u.rate=1.2; u.pitch=1.05;
+      const tw=window.speechSynthesis.getVoices().find(v=>v.lang==='zh-TW')||null;
+      if(tw)u.voice=tw;
+      u.onend=_onByeEnd;
+      u.onerror=(e)=>{if(e.error==='canceled'||e.error==='interrupted')return; _onByeEnd();};
+      window.speechSynthesis.speak(u);
+    });
+  }
+
+  // ── 未知指令：有 API Key 就交給 AI 回答，否則給提示 ──────────
+  else{
+    if(apiKey&&cmd.length>2){
+      if(_processingGuard){clearTimeout(_processingGuard);_processingGuard=null;}
+      _processingGuard=setTimeout(resetProcessingState,20000);
+      callGemini('你是鈞曜科技AI秘書刀疤。請用繁體中文，30字以內簡短回答（不要用條列）：'+cmd)
+        .then(res=>{
+          const clean=res.replace(/[【】\*#\n]/g,' ').trim().slice(0,200);
+          speakFeedback(clean);
+        })
+        .catch(()=>speakFeedback('我沒聽懂 可以說 每日簡報 載入新聞 或 新增待辦'));
+    }else{
+      speakFeedback('我沒聽懂 可以說 每日簡報 載入新聞 或 新增待辦');
+    }
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+//  創意討論室  v3.14
+// ════════════════════════════════════════════════════════════
+
+function addIdeaBubble(role, text){
+  const area = document.getElementById('idea-chat-area');
+  // 移除空狀態提示
+  const empty = area.querySelector('.idea-empty-state');
+  if(empty) empty.remove();
+
+  const wrap = document.createElement('div');
+  wrap.style.cssText = `display:flex;gap:8px;align-items:flex-end;${role==='user'?'flex-direction:row-reverse':''}`;
+
+  const avatar = document.createElement('div');
+  avatar.style.cssText = `width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;${role==='user'?'background:#3b82f6':'background:#f59e0b'}`;
+  avatar.textContent = role==='user' ? '我' : '刀';
+
+  const bubble = document.createElement('div');
+  bubble.style.cssText = `max-width:78%;padding:10px 14px;border-radius:${role==='user'?'14px 4px 14px 14px':'4px 14px 14px 14px'};font-size:14px;line-height:1.7;white-space:pre-wrap;${role==='user'?'background:#3b82f6;color:#fff':'background:var(--bg2);border:1px solid var(--border);color:var(--text)'}`;
+  bubble.textContent = text;
+
+  wrap.appendChild(avatar);
+  wrap.appendChild(bubble);
+  area.appendChild(wrap);
+  area.scrollTop = area.scrollHeight;
+  return bubble;
+}
+
+function showIdeaTyping(){
+  const area = document.getElementById('idea-chat-area');
+  const wrap = document.createElement('div');
+  wrap.id = 'idea-typing-indicator';
+  wrap.style.cssText = 'display:flex;gap:8px;align-items:flex-end';
+
+  const avatar = document.createElement('div');
+  avatar.style.cssText = 'width:30px;height:30px;border-radius:50%;background:#f59e0b;display:flex;align-items:center;justify-content:center;font-size:14px;color:#000;flex-shrink:0';
+  avatar.textContent = '刀';
+
+  const bubble = document.createElement('div');
+  bubble.style.cssText = 'padding:10px 16px;border-radius:4px 14px 14px 14px;background:var(--bg2);border:1px solid var(--border)';
+  bubble.innerHTML = '<span style="display:inline-flex;gap:4px"><span style="animation:blink 1s infinite 0s">●</span><span style="animation:blink 1s infinite .2s">●</span><span style="animation:blink 1s infinite .4s">●</span></span>';
+
+  wrap.appendChild(avatar);
+  wrap.appendChild(bubble);
+  area.appendChild(wrap);
+  area.scrollTop = area.scrollHeight;
+}
+
+function hideIdeaTyping(){
+  const el = document.getElementById('idea-typing-indicator');
+  if(el) el.remove();
+}
+
+function setIdeaStatus(text, icon){
+  const el = document.getElementById('idea-status-text');
+  if(el) el.textContent = text;
+  const ic = document.querySelector('#idea-status i');
+  if(ic && icon){ ic.className = 'ti '+icon; }
+}
+
+async function searchForIdea(query){
+  try{
+    const url = `https://corsproxy.io/?https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1&skip_disambig=1`;
+    const res = await fetch(url);
+    const data = await res.json();
+    let snippets = [];
+    if(data.AbstractText) snippets.push(data.AbstractText);
+    (data.RelatedTopics||[]).slice(0,3).forEach(t=>{
+      if(t.Text) snippets.push(t.Text);
+    });
+    return snippets.slice(0,3).join(' ').slice(0,400) || '';
+  }catch(e){ return ''; }
+}
+
+async function sendIdeaMessage(){
+  const input = document.getElementById('idea-chat-input');
+  const userText = (input.value||'').trim();
+  if(!userText) return;
+  input.value = '';
+
+  // ★ 防止重複呼叫（Chrome 補發辨識事件會造成第二次進入）
+  if(_ideaSending) return;
+  _ideaSending = true;
+
+  // ★ 立刻停麥克風，避免 AI 回覆的 TTS 被自己收音
+  if(voiceCtrlRecognition && voiceCtrlActive){
+    try{ voiceCtrlRecognition.stop(); }catch(e){}
+  }
+
+  // 顯示用戶泡泡
+  addIdeaBubble('user', userText);
+  _ideaChatHistory.push({role:'user', content:userText});
+  _ideaExchangeCount++;
+
+  // 2輪後顯示整理按鈕
+  if(_ideaExchangeCount >= 2){
+    document.getElementById('idea-finalize-area').style.display = 'block';
+  }
+
+  // 上網搜尋相關資料
+  showIdeaTyping();
+  let webSnippet = '';
+  // 第一輪或關鍵字明顯時才搜尋，避免每次都等待
+  if(_ideaExchangeCount <= 2){
+    webSnippet = await searchForIdea(userText.slice(0, 60));
+  }
+
+  // 組建系統提示
+  const systemPrompt = `你是鈞曜科技 AI 秘書刀疤，現在扮演創意顧問角色。
+用繁體中文，以輕鬆對話方式：
+1. 先肯定對方的想法，給出1~2點具體看法或潛在價值
+2. 如果有網路資料，自然帶入相關背景（不要說「根據搜尋」，直接融入對話）
+3. 提出1個最關鍵的問題，幫助把想法說得更具體
+每次回覆控制在120字以內，口語化，不要用條列符號。`;
+
+  const messages = [{role:'system', content:systemPrompt}];
+  if(webSnippet) messages.push({role:'system', content:`補充資料（自然融入，不要直接引用）：${webSnippet}`});
+  messages.push(..._ideaChatHistory.slice(-8)); // 保留最近8輪
+
+  try{
+    const reply = await callGemini(messages);
+    hideIdeaTyping();
+    const cleanReply = reply.replace(/[*#\[\]]/g,'').trim();
+    addIdeaBubble('assistant', cleanReply);
+    _ideaChatHistory.push({role:'assistant', content:cleanReply});
+    setIdeaStatus(`已討論 ${_ideaExchangeCount} 輪，可繼續討論或按「整理成簡報大綱」`, 'ti-messages');
+    // 語音朗讀：用 speakChain 確保麥克風在朗讀前關閉、說完再重啟
+    if(isAwake && voiceCtrlActive){
+      speakChain(cleanReply); // _voiceChainDone 會在播完後重啟麥克風
+    }
+    // speakChain 播完或不朗讀時，都要解除 _ideaSending
+    // _voiceChainDone 已有 isProcessing=false，_ideaSending 在此清除
+    _ideaSending = false;
+  }catch(e){
+    hideIdeaTyping();
+    addIdeaBubble('assistant','抱歉，我剛才想太多了，可以再說一次嗎？');
+    _ideaSending = false; // 錯誤時也要清除，否則系統永久卡住
+  }
+}
+
+async function finalizeIdea(){
+  if(_ideaChatHistory.length < 2){ showToast('⚠️ 請先和刀疤討論一下你的想法'); return; }
+
+  const btn = document.getElementById('idea-finalize-btn-wrap');
+  if(btn) btn.innerHTML = '<div style="text-align:center;padding:10px;color:var(--text2)"><i class="ti ti-loader-2 spin"></i> 整理中...</div>';
+
+  const conversationText = _ideaChatHistory
+    .map(m=>(m.role==='user'?'【想法提出人】':'【刀疤顧問】')+m.content)
+    .join('\n');
+
+  const prompt = `以下是創意討論對話，請根據討論內容整理出簡報結構，用 JSON 格式輸出：
+{
+  "title": "簡報標題",
+  "subtitle": "副標題或一句話摘要",
+  "slides": [
+    {"title": "章節名稱", "points": ["重點1","重點2","重點3"]},
+    ...（3~5個章節）
+  ]
+}
+只輸出 JSON，不要其他說明。討論內容：\n${conversationText}`;
+
+  try{
+    const raw = await callGemini(prompt);
+    const jsonMatch = raw.match(/\{[\s\S]*\}/);
+    if(!jsonMatch) throw new Error('no json');
+    _ideaSlides = JSON.parse(jsonMatch[0]);
+
+    // 顯示結果區
+    document.getElementById('idea-ready-section').style.display = 'block';
+    if(btn) btn.style.display = 'none';
+    setIdeaStatus('✅ 大綱整理完成！選擇風格後下載簡報', 'ti-check');
+
+    // 顯示摘要泡泡
+    const summary = (_ideaSlides.slides||[]).map((s,i)=>`${i+1}. ${s.title}`).join('\n');
+    addIdeaBubble('assistant', `好的！我幫你整理成以下架構：\n${summary}\n\n可以選擇風格下載 PPTX，或複製大綱到 Gamma.app 製作更精美的版本！`);
+
+    if(isAwake && voiceCtrlActive) speakFeedback('大綱整理完成 請選擇簡報風格再下載');
+  }catch(e){
+    if(btn) btn.innerHTML = '<button onclick="finalizeIdea()" style="width:100%;padding:11px;background:linear-gradient(135deg,#f59e0b,#d97706);color:#000;border:none;border-radius:8px;font-size:14px;font-weight:bold;cursor:pointer"><i class="ti ti-sparkles"></i> 整理成簡報大綱</button>';
+    showToast('❌ 整理失敗，請再試一次');
+  }
+}
+
+function clearIdea(){
+  _ideaChatHistory = [];
+  _ideaExchangeCount = 0;
+  _ideaSlides = null;
+  const area = document.getElementById('idea-chat-area');
+  area.innerHTML = `<div class="idea-empty-state" style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:var(--text2);font-size:13px;gap:10px">
+    <i class="ti ti-bulb" style="font-size:32px;color:#f59e0b"></i>
+    <div style="text-align:center;line-height:1.8">輸入你的想法，刀疤會：<br>① 給你看法和意見　② 上網查相關資料　③ 問關鍵問題</div>
+  </div>`;
+  document.getElementById('idea-chat-input').value = '';
+  document.getElementById('idea-finalize-area').style.display = 'none';
+  document.getElementById('idea-ready-section').style.display = 'none';
+  document.getElementById('gamma-hint').style.display = 'none';
+  const btnWrap = document.getElementById('idea-finalize-btn-wrap');
+  if(btnWrap){ btnWrap.style.display='block'; btnWrap.innerHTML='<button onclick="finalizeIdea()" style="width:100%;padding:11px;background:linear-gradient(135deg,#f59e0b,#d97706);color:#000;border:none;border-radius:8px;font-size:14px;font-weight:bold;cursor:pointer"><i class="ti ti-sparkles"></i> 整理成簡報大綱</button>'; }
+  setIdeaStatus('說出你的想法，刀疤會提出看法和問題，一起把想法變具體','ti-bulb');
+}
+
+function setIdeaTheme(theme){
+  _ideaTheme = theme;
+  ['dark','light','vivid'].forEach(t=>{
+    const btn = document.getElementById('theme-btn-'+t);
+    if(!btn) return;
+    btn.style.opacity = (t===theme)?'1':'0.55';
+    btn.style.transform = (t===theme)?'scale(1.05)':'scale(1)';
+  });
+  showToast('✅ 已選擇' + (theme==='dark'?'專業深色':theme==='light'?'現代簡潔':'活潑鮮豔') + '風格');
+}
+
+function copyForGamma(){
+  if(!_ideaSlides||!_ideaSlides.slides){showToast('⚠️ 請先整理想法');return;}
+  const d=_ideaSlides;
+  let md='';
+  md+=`# ${d.title||'創意提案'}\n`;
+  md+=`${d.subtitle||'鈞曜科技有限公司'}\n\n`;
+  d.slides.forEach(s=>{md+=`- ${s.title||''}\n`;});
+  md+='\n';
+  d.slides.forEach(s=>{
+    md+=`## ${s.title||''}\n`;
+    (s.points||[]).forEach(p=>{md+=`- ${p}\n`;});
+    md+='\n';
+  });
+  md+=`## 重點摘要\n`;
+  d.slides.forEach(s=>{
+    const first=(s.points||[])[0]||'';
+    if(first)md+=`- **${s.title}**：${first}\n`;
+  });
+  md+='\n## 謝謝聆聽\n鈞曜科技有限公司';
+  navigator.clipboard.writeText(md)
+    .then(()=>{ document.getElementById('gamma-hint').style.display='block'; showToast('✅ 大綱已複製！請前往 Gamma.app 貼上'); })
+    .catch(()=>{
+      const ta=document.createElement('textarea');
+      ta.value=md; document.body.appendChild(ta); ta.select();
+      document.execCommand('copy'); document.body.removeChild(ta);
+      document.getElementById('gamma-hint').style.display='block';
+      showToast('✅ 大綱已複製！請前往 Gamma.app 貼上');
+    });
+}
+
+// ── downloadIdeaPPTX ─────────────────────────────────────────
+async function downloadIdeaPPTX(){
+  if(!window.PptxGenJS){showToast('⚠️ 簡報套件載入中，請稍後再試');return;}
+  const data=_ideaSlides;
+  if(!data||!data.slides||data.slides.length===0){showToast('⚠️ 沒有可用的簡報資料');return;}
+  try{
+    const pptx = new PptxGenJS();
+    pptx.title = data.title||'創意提案';
+    pptx.subject = data.subtitle||'鈞曜科技有限公司';
+    let cover = pptx.addSlide();
+    cover.background = {color:'1a1a2e'};
+    cover.addText(data.title||'創意提案',{x:0.5,y:1.5,w:9,h:1.2,fontSize:36,bold:true,color:'f59e0b',align:'center'});
+    cover.addText(data.subtitle||'鈞曜科技有限公司',{x:0.5,y:2.9,w:9,h:0.6,fontSize:18,color:'e2e8f0',align:'center'});
+    cover.addText('鈞曜科技有限公司',{x:0.5,y:4.5,w:9,h:0.5,fontSize:14,color:'94a3b8',align:'center'});
+    data.slides.forEach(s=>{
+      let sl = pptx.addSlide();
+      sl.background = {color:'1a1a2e'};
+      sl.addText(s.title||'',{x:0.4,y:0.3,w:9.2,h:0.8,fontSize:24,bold:true,color:'f59e0b'});
+      const bodyText = (s.points||[]).map(p=>'• '+p).join('\n');
+      if(bodyText){ sl.addText(bodyText,{x:0.4,y:1.3,w:9.2,h:4.2,fontSize:16,color:'e2e8f0',valign:'top',breakLine:true}); }
+    });
+    let end = pptx.addSlide();
+    end.background = {color:'1a1a2e'};
+    end.addText('謝謝聆聽',{x:0.5,y:2.0,w:9,h:1.0,fontSize:32,bold:true,color:'f59e0b',align:'center'});
+    end.addText('鈞曜科技有限公司',{x:0.5,y:3.2,w:9,h:0.6,fontSize:18,color:'e2e8f0',align:'center'});
+    await pptx.writeFile({fileName:(data.title||'創意提案')+'.pptx'});
+    showToast('✅ 簡報下載完成！');
+  }catch(err){
+    console.error('[刀疤] PPTX 下載失敗：',err);
+    showToast('⚠️ 簡報下載失敗，請重試');
+  }
+}
+
+// ── 頁面初始化入口 ─────────────────────────────────────────────
+init();
+</script>
+</body>
+</html>
