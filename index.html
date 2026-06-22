@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>鈞曜科技 AI 秘書 v3.89</title>
+<title>鈞曜科技 AI 秘書 v3.91</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
@@ -253,7 +253,7 @@ input:focus { outline: none; border-color: var(--info) !important; }
     <div class="logo"><i class="ti ti-robot"></i></div>
     <div class="header-text">
       <h1>鈞曜科技 AI 秘書</h1>
-      <p>會議記錄 ・ 待辦追蹤 ・ 每日晨報 ・ Outlook &nbsp;<span style="font-size:11px;background:#22c55e22;color:#22c55e;border:1px solid #22c55e44;border-radius:20px;padding:1px 8px;vertical-align:middle">v3.89</span></p>
+      <p>會議記錄 ・ 待辦追蹤 ・ 每日晨報 ・ Outlook &nbsp;<span style="font-size:11px;background:#22c55e22;color:#22c55e;border:1px solid #22c55e44;border-radius:20px;padding:1px 8px;vertical-align:middle">v3.91</span></p>
     </div>
     <div class="header-right" style="display:flex;gap:8px;align-items:center">
       <div class="api-status ok" id="api-status"><i class="ti ti-check"></i> AI 已連線</div>
@@ -624,6 +624,106 @@ function showToast(msg, duration){
   el._timer=setTimeout(()=>{el.style.opacity='0';},duration);
 }
 
+// ── 智慧對話浮動面板 ──────────────────────────────────────────────
+function toggleChat(){
+  const panel=document.getElementById('chat-panel');
+  if(!panel)return;
+  panel.classList.toggle('open');
+  if(panel.classList.contains('open')){
+    setTimeout(()=>{
+      const inp=document.getElementById('chat-text-input');
+      if(inp)inp.focus();
+    },100);
+  }
+}
+
+async function sendChat(){
+  const inp=document.getElementById('chat-text-input');
+  const msgs=document.getElementById('chat-msgs');
+  if(!inp||!msgs)return;
+  const text=inp.value.trim();
+  if(!text)return;
+  inp.value='';
+
+  // 顯示使用者訊息
+  const userBubble=document.createElement('div');
+  userBubble.className='chat-msg user';
+  userBubble.textContent=text;
+  msgs.appendChild(userBubble);
+
+  // 顯示 AI 思考中
+  const aiBubble=document.createElement('div');
+  aiBubble.className='chat-msg ai';
+  aiBubble.textContent='思考中...';
+  msgs.appendChild(aiBubble);
+  msgs.scrollTop=msgs.scrollHeight;
+
+  try{
+    const pending=todos.filter(t=>!t.done).length;
+    const urgent=todos.filter(t=>{
+      if(t.done||!t.date)return false;
+      const d=daysUntil(t.date);return d!==null&&d<=3&&d>=0;
+    });
+    const context=`你是鈞曜科技有限公司（台灣物料管理設備製造商，產品：垂直式/旋轉式自動倉儲）總經理bruce的AI秘書刀疤。目前待辦：${pending}件，緊急：${urgent.length}件。請用繁體中文簡潔回答，適合對話的語氣。`;
+    const reply=await callGemini(context+'\n\n問題：'+text);
+    aiBubble.textContent=reply||'抱歉，我現在無法回答，請稍後再試。';
+  }catch(e){
+    aiBubble.textContent='連線失敗，請稍後再試。';
+  }
+  msgs.scrollTop=msgs.scrollHeight;
+}
+
+// ── 今日工作回顧（AI 生成）────────────────────────────────────────
+async function generateWorkReview(){
+  if(!apiKey){showToast('請先設定 Groq API Key');return;}
+  const btn=document.getElementById('review-btn');
+  const loading=document.getElementById('review-loading');
+  const result=document.getElementById('review-result');
+  if(btn)btn.disabled=true;
+  if(loading)loading.style.display='block';
+  if(result){result.style.display='none';result.textContent='';}
+
+  try{
+    const now=new Date();
+    const weekdays=['日','一','二','三','四','五','六'];
+    const dateStr=`${now.getMonth()+1}月${now.getDate()}號星期${weekdays[now.getDay()]}`;
+    const done=_completedToday.length>0?_completedToday.map(t=>t.text).join('、'):'（本次開啟後尚未完成待辦）';
+    const pending=todos.filter(t=>!t.done);
+    const pendingTxt=pending.length>0?pending.slice(0,5).map(t=>`${t.text}${t.date?'（截止'+t.date+'）':''}`).join('、'):'無待辦';
+    const urgent=pending.filter(t=>{if(!t.date)return false;const d=daysUntil(t.date);return d!==null&&d<=3&&d>=0;});
+
+    const prompt=`你是鈞曜科技有限公司（台灣物料管理設備製造商，產品：垂直式/旋轉式自動倉儲）總經理bruce的AI秘書刀疤。
+今天是${dateStr}。
+今日完成事項：${done}
+待辦清單（前5項）：${pendingTxt}
+緊急事項（3天內到期）：${urgent.length>0?urgent.map(t=>t.text).join('、'):'無'}
+
+請用繁體中文撰寫今日工作回顧，包含：
+1. 今日工作小結（1-2句）
+2. 待辦優先建議（列出最重要2-3件及理由）
+3. 明日重點提醒（1-2句）
+語氣親切專業，像秘書向主管匯報，整體不超過150字。`;
+
+    const reply=await callGemini(prompt);
+    if(result){
+      result.textContent=reply||'AI 生成失敗，請稍後再試。';
+      result.style.display='block';
+    }
+    // 語音朗讀
+    if(isAwake&&voiceCtrlActive&&reply){
+      speakChain(reply);
+    }
+  }catch(e){
+    if(result){result.textContent='生成失敗：'+e.message;result.style.display='block';}
+    showToast('工作回顧生成失敗');
+  }finally{
+    if(btn)btn.disabled=false;
+    if(loading)loading.style.display='none';
+  }
+}
+
+
+
 function preprocessTTS(text){
   return (text||'')
     .replace(/％/g,'百分之').replace(/%/g,'百分之')
@@ -736,7 +836,7 @@ let _voiceNewsItems=[];  // 儲存最近載入的新聞，供語音分析使用
 let _meetingDocs=[];   // 會議前上傳的參考文件 [{name,content}]
 let _lastSpokenText='';  // 記住最後一句話，供「重複」指令使用
 let _completedToday=[];  // 本次開啟後完成的待辦，供晚間簡報使用
-// ── 語音狀態機全域變數 (v3.89) ──────────────────────────────────
+// ── 語音狀態機全域變數 (v3.91) ──────────────────────────────────
 let _voiceState='off';      // 'off'|'standby'|'awake'|'processing'|'speaking'
 let _ttsGen=0;              // 遞增取消正在播放的 TTS
 // 相容舊程式碼的讀取變數（只由 _setState 寫入）
@@ -1954,7 +2054,7 @@ function switchTab(tab){
   document.getElementById('tab-'+tab).classList.add('active');
 }
 
-// ── 語音狀態機核心 (v3.89) ──────────────────────────────────────
+// ── 語音狀態機核心 (v3.91) ──────────────────────────────────────
 // ElevenLabs 已停用（長期 HTTP 401，只造成延遲與不穩定）
 
 const ELEVEN_VOICE_ID=''; // 已停用
@@ -2257,6 +2357,38 @@ function _recordElevenSuccess(){}
 async function _elevenTTS(text,genCheck,onEnd,onFail){if(onFail)onFail();}
 
 // ── Chrome TTS 備援：等待聲音清單載入後再朗讀 ─────────────────
+// ── Google TTS（主要朗讀，失敗自動切換 Chrome TTS）──────────────────
+async function _googleTTS(text, genCheck, onEnd, onFail){
+  let _called=false, _tmo=null, _audio=null;
+  function _ok(){
+    if(_called)return; _called=true; clearTimeout(_tmo);
+    if(_currentTTSAudio===_audio)_currentTTSAudio=null;
+    onEnd();
+  }
+  function _fail(){
+    if(_called)return; _called=true; clearTimeout(_tmo);
+    if(_audio){try{_audio.pause();}catch(e){}}
+    if(_currentTTSAudio===_audio)_currentTTSAudio=null;
+    if(genCheck())onFail();
+  }
+  try{
+    const shortText=preprocessTTS(text).substring(0,180);
+    if(!shortText||!genCheck()){onFail();return;}
+    const url='https://translate.google.com/translate_tts?ie=UTF-8&tl=zh-TW&client=tw-ob&q='
+              +encodeURIComponent(shortText);
+    if(_currentTTSAudio){_currentTTSAudio.pause();_currentTTSAudio=null;}
+    _audio=new Audio(url);
+    _currentTTSAudio=_audio;
+    _audio.onended=_ok;
+    _audio.onerror=_fail;
+    _tmo=setTimeout(_fail,5000);
+    await _audio.play();
+  }catch(e){
+    console.warn('[刀疤] Google TTS 例外：',e.message||e);
+    _fail();
+  }
+}
+
 function _chromeTTSSpeak(text, onDone){
   function _doSpeak(){
     const voices = window.speechSynthesis.getVoices();
@@ -2348,7 +2480,7 @@ function _warmupChromeTTS(){
   }
 }
 
-// ── 語音控制（v3.89 狀態機版）──────────────────────────────────────
+// ── 語音控制（v3.91 狀態機版）──────────────────────────────────────
 let voiceCtrlRecognition=null;
 let sleepTimeout=null;   // 相容舊程式碼（_onSpeakDone 等仍用此名）
 let _processingGuard=null; // 相容 executeVoiceCommand
@@ -2406,7 +2538,7 @@ function stopVoiceControl(){
   showToast('語音控制已關閉');
 }
 
-// ── 麥克風安全重啟（v3.82 遺失，v3.89 補回）─────────────────────────
+// ── 麥克風安全重啟（v3.82 遺失，v3.91 補回）─────────────────────────
 function _restartMic(){
   if(!voiceCtrlActive||!voiceCtrlRecognition)return;
   if(isTTSSpeaking)return; // TTS 播放中，不搶音訊資源
