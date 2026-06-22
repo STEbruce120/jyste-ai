@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>鈞曜科技 AI 秘書 v3.81</title>
+<title>鈞曜科技 AI 秘書 v3.82</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
@@ -253,7 +253,7 @@ input:focus { outline: none; border-color: var(--info) !important; }
     <div class="logo"><i class="ti ti-robot"></i></div>
     <div class="header-text">
       <h1>鈞曜科技 AI 秘書</h1>
-      <p>會議記錄 ・ 待辦追蹤 ・ 每日晨報 ・ Outlook &nbsp;<span style="font-size:11px;background:#22c55e22;color:#22c55e;border:1px solid #22c55e44;border-radius:20px;padding:1px 8px;vertical-align:middle">v3.81</span></p>
+      <p>會議記錄 ・ 待辦追蹤 ・ 每日晨報 ・ Outlook &nbsp;<span style="font-size:11px;background:#22c55e22;color:#22c55e;border:1px solid #22c55e44;border-radius:20px;padding:1px 8px;vertical-align:middle">v3.82</span></p>
     </div>
     <div class="header-right" style="display:flex;gap:8px;align-items:center">
       <div class="api-status ok" id="api-status"><i class="ti ti-check"></i> AI 已連線</div>
@@ -647,11 +647,7 @@ function setupRecognitionHandlers(){
       const confirmWords=['確認','對','沒錯','是的','好','OK','ok','取消','算了','不要','不用了','不對'];
       if(confirmWords.some(w=>cmd.includes(w))){
         if(isTTSSpeaking){
-          // 同時停止 ElevenLabs 音頻和 Chrome TTS
-          if(_currentTTSAudio){ _currentTTSAudio.pause(); _currentTTSAudio=null; }
-          window.speechSynthesis.cancel();
-          isTTSSpeaking=false;
-          _feedbackGen++; // 讓舊的 speakFeedback onend 失效
+          _cancelTTS(); // 停止目前朗讀，讓使用者的確認/取消指令立即生效
         }
         isProcessing=true;
         executeVoiceCommand(cmd);
@@ -738,16 +734,9 @@ let _meetingDocs=[];   // 會議前上傳的參考文件 [{name,content}]
 let _lastSpokenText='';  // 記住最後一句話，供「重複」指令使用
 let _completedToday=[];  // 本次開啟後完成的待辦，供晚間簡報使用
 let isTTSSpeaking=false; // TTS 播報期間為 true，防止辨識在段落空隙誤收自己的聲音
-let _isTTSSpeakingSetAt=0;      // 記錄 isTTSSpeaking 設為 true 的時間，供看門狗偵測卡死
-let _chainTookOver=false; // speakChain 主動取消 speakFeedback 時設為 true，避免 onerror 干擾
-let _speakChainKeepAlive=null; // speakChain 的保活計時器（全域，避免舊的殘留）
-let _ttsEngineKeepAlive=null;  // Chrome TTS 引擎保活計時器
-let _voiceWatchdog=null;        // 全域看門狗 setInterval ID
-let _feedbackGen=0;             // 每次 speakFeedback 啟動時遞增
-let _speakChainGen=0;           // 每次 speakChain 呼叫遞增
+
 let _elevenFailCount=0;
-let _lastElevenStatus=0;       // 最近一次 ElevenLabs HTTP 狀態碼         // ElevenLabs 連續失敗次數
-let _elevenDisabledUntil=0;     // 暫停使用 ElevenLabs 的截止時間戳（毫秒）
+
 // ── 創意討論室 ──
 let _ideaChatHistory=[];  // 對話歷史 [{role:'user'|'assistant',content:'...'}]
 let _ideaExchangeCount=0; // 來回次數（user 說一次+1）
@@ -1927,377 +1916,107 @@ function switchTab(tab){
   document.getElementById('tab-'+tab).classList.add('active');
 }
 
-// ── 語音播報（ElevenLabs 真人音色）──────────────────
-// ElevenLabs 雲端 TTS 設定
-localStorage.setItem('jyste_eleven_key','sk_b0fb14adb69339645b4e8276c6ccb0b12c4280648446a65d');
-const ELEVEN_VOICE_ID='21m00Tcm4TlvDq8ikWAM'; // Rachel（已確認支援中文）
-let isSpeaking=false;
+// ── 語音狀態機核心 (v3.82) ──────────────────────────────────────
+// ElevenLabs 已停用（長期 HTTP 401，只造成延遲與不穩定）
+
+const ELEVEN_VOICE_ID=''; // 已停用
+let isSpeaking=false;      // 每日簡報用
 let currentAudio=null;
 let speakKeepAlive=null;
-let _currentTTSAudio=null; // ElevenLabs 目前播放的 Audio 物件
+let _currentTTSAudio=null; // Google TTS 目前播放的 Audio 物件
 
-function buildDailyBriefing(){
-  const now=new Date();
-  const weekdays=['日','一','二','三','四','五','六'];
-  const month=now.getMonth()+1;
-  const day=now.getDate();
-  const weekday=weekdays[now.getDay()];
-  const h=now.getHours();
-
-  const pending=todos.filter(t=>!t.done).length;
-  const urgent=todos.filter(t=>{
-    if(t.done||!t.date)return false;
-    const d=daysUntil(t.date);
-    return d!==null&&d<=3&&d>=0;
-  });
-  const overdue=todos.filter(t=>{
-    if(t.done||!t.date)return false;
-    return daysUntil(t.date)<0;
-  });
-
-  const morningOpeners=[
-    `bruce哥早安 今天${month}月${day}號星期${weekday} 幫你看一下今天的狀況`,
-    `早安 bruce哥 ${month}月${day}號星期${weekday} 新的一天開始了`,
-    `早安 bruce哥 今天${month}月${day}號星期${weekday} 來報告一下今天的重點`
-  ];
-  const afternoonOpeners=[
-    `bruce哥午安 ${month}月${day}號下午 幫你更新一下進度`,
-    `午安 bruce哥 ${month}月${day}號 看看下午有什麼要處理的`
-  ];
-  const eveningOpeners=[
-    `bruce哥辛苦了 ${month}月${day}號晚上 看看今天還有什麼沒處理的`,
-    `晚安 bruce哥 ${month}月${day}號 今天快結束了來做個收尾`
-  ];
-
-  let openers=h<12?morningOpeners:h<18?afternoonOpeners:eveningOpeners;
-  let text=openers[Math.floor(Math.random()*openers.length)];
-
-  if(overdue.length>0&&urgent.length>0){
-    text+=` 要提醒你 有${overdue.length}件事已經過期`;
-    if(overdue.length<=2) text+=` 是${overdue.map(t=>t.text).join('和')}`;
-    text+=` 另外還有${urgent.length}件快到期 請盡快安排處理`;
-  }else if(overdue.length>0){
-    text+=` 要提醒你 有${overdue.length}件事已經過了截止日期`;
-    if(overdue.length<=2) text+=` 是${overdue.map(t=>t.text).join('和')}`;
-    text+=` 請盡快處理`;
-  }else if(urgent.length>0){
-    text+=` 提醒你 有${urgent.length}件事快到期了`;
-    urgent.slice(0,2).forEach(t=>{
-      const d=daysUntil(t.date);
-      const when=d===0?'今天到期':d===1?'明天到期':'還有'+d+'天到期';
-      text+=` ${t.text}${when}`;
-    });
-    text+=` 記得安排時間處理`;
-  }else if(pending>0){
-    text+=` 目前還有${pending}件待辦事項 進度都在掌控中 繼續加油`;
-  }else{
-    const freeTexts=[
-      ` 目前沒有任何待辦事項 今天可以輕鬆一點`,
-      ` 今天的事情都清完了 難得清閒好好把握`,
-      ` 目前一切清空 保持這個好狀態`
-    ];
-    text+=freeTexts[Math.floor(Math.random()*freeTexts.length)];
-  }
-
-  const endings=[
-    ' 有任何需要隨時告訴我',
-    ' 今天也請多保重 有事找我',
-    ' 工作順利 有需要我隨時在',
-    ' 記得適時休息 有事直接說',
-    ' 今天累了吧 有需要隨時來找我'
-  ];
-  text+=endings[Math.floor(Math.random()*endings.length)];
-
-  return text;
+// ── 設定語音狀態（唯一的狀態寫入點）─────────────────────────────
+function _setState(state){
+  _voiceState=state;
+  voiceCtrlActive=(state!=='off');
+  isAwake=['awake','processing','speaking'].includes(state);
+  isProcessing=(state==='processing');
+  isTTSSpeaking=(state==='speaking');
+  _updateVoiceUI();
 }
 
-function speakEveningBriefing(){
-  const now=new Date();
-  const weekdays=['日','一','二','三','四','五','六'];
-  const month=now.getMonth()+1;
-  const day=now.getDate();
-  const weekday=weekdays[now.getDay()];
+function _updateVoiceUI(){
+  const btn=document.getElementById('voice-ctrl-btn');
+  const bar=document.getElementById('voice-ctrl-bar');
+  const status=document.getElementById('voice-ctrl-status');
+  if(!btn)return;
+  if(_voiceState==='off'){
+    btn.style.background='';btn.style.borderColor='';btn.style.color='var(--text2)';
+    if(bar)bar.style.display='none';
+  }else if(_voiceState==='standby'){
+    btn.style.background='#1e3a5f';btn.style.borderColor='#3b82f6';btn.style.color='#93c5fd';
+    if(bar)bar.style.display='flex';
+    if(status)status.textContent='語音控制已開啟 說「刀疤」喚醒我';
+    const res=document.getElementById('voice-ctrl-result');if(res)res.textContent='';
+  }else if(_voiceState==='awake'){
+    btn.style.background='#14532d';btn.style.borderColor='#22c55e';btn.style.color='#22c55e';
+    if(status)status.textContent='刀疤已喚醒 請說指令 說「再見」結束對話';
+  }
+}
 
-  const openers=[
-    `bruce哥辛苦了 今天${month}月${day}號星期${weekday} 來幫你做個收尾`,
-    `收工了 bruce哥 ${month}月${day}號星期${weekday} 幫你整理一下今天的狀況`,
-    `bruce哥今天辛苦了 來看看${month}月${day}號的成果`
-  ];
-  let text=openers[Math.floor(Math.random()*openers.length)];
+function _cancelTTS(){
+  _ttsGen++;
+  if(_currentTTSAudio){try{_currentTTSAudio.pause();}catch(e){}_currentTTSAudio=null;}
+  window.speechSynthesis.cancel();
+}
 
-  // 今日完成事項
-  if(_completedToday.length>0){
-    text+=` 今天完成了${_completedToday.length}件事`;
-    if(_completedToday.length<=3){
-      text+=` 包括${_completedToday.map(t=>t.text).join('、')}`;
+// ── 核心朗讀（取代 speakFeedback + speakChain）────────────────────
+async function _speak(text){
+  if(!text||_voiceState==='off')return;
+  _lastSpokenText=text;
+  const myGen=++_ttsGen;
+  isTTSSpeaking=true;
+  if(_currentTTSAudio){try{_currentTTSAudio.pause();}catch(e){}_currentTTSAudio=null;}
+  if(sleepTimeout){clearTimeout(sleepTimeout);sleepTimeout=null;}
+
+  const chunks=text.split(/(?<=[。！？!?\n])/g).map(s=>s.trim()).filter(s=>s.length>0);
+  if(chunks.length===0)chunks.push(text.trim());
+
+  for(const chunk of chunks){
+    if(_ttsGen!==myGen)return;
+    const googleOk=await new Promise(resolve=>{
+      _googleTTS(chunk,()=>_ttsGen===myGen,()=>resolve(true),()=>resolve(false));
+    });
+    if(_ttsGen!==myGen)return;
+    if(!googleOk){
+      await new Promise(resolve=>{
+        let _done=false;
+        const _t=setTimeout(()=>{if(!_done){_done=true;resolve();}},30000);
+        _chromeTTSSpeak(chunk,()=>{if(!_done){_done=true;clearTimeout(_t);resolve();}});
+      });
+      if(_ttsGen!==myGen)return;
     }
-    text+=' 很不錯';
-  }else{
-    text+=' 今天沒有從這裡完成待辦事項';
   }
-
-  // 剩餘未完成
-  const pending=todos.filter(t=>!t.done);
-  const overdue=pending.filter(t=>{ if(!t.date)return false; return daysUntil(t.date)<0; });
-  const urgent=pending.filter(t=>{ if(!t.date)return false; const d=daysUntil(t.date); return d!==null&&d>=0&&d<=3; });
-
-  if(overdue.length>0){
-    text+=` 另外提醒你 有${overdue.length}件事已經過了截止日期`;
-    if(overdue.length<=2) text+=` 是${overdue.map(t=>t.text).join('和')}`;
-    text+=' 明天記得優先處理';
-  }else if(urgent.length>0){
-    text+=` 還有${urgent.length}件事快到期了`;
-    urgent.slice(0,2).forEach(t=>{
-      const d=daysUntil(t.date);
-      const when=d===0?'今天到期':d===1?'明天到期':'還有'+d+'天';
-      text+=` ${t.text}${when}`;
-    });
-    text+=' 記得安排時間';
-  }else if(pending.length>0){
-    text+=` 還有${pending.length}件待辦 明天繼續加油`;
-  }else{
-    text+=' 今天的事情全部清完了 難得清閒 好好休息';
-  }
-
-  const endings=[
-    ' 好好休息 明天見',
-    ' 今天辛苦了 早點休息',
-    ' 明天見 bruce哥 好好休息',
-    ' 有需要明天再找我 先好好休息'
-  ];
-  text+=endings[Math.floor(Math.random()*endings.length)];
-
-  speakChain(text);
+  if(_ttsGen===myGen)_onSpeakDone();
 }
 
-function autoSpeakIfFirstVisitToday(){
-  const today=new Date().toISOString().slice(0,10);
-  const lastVisit=localStorage.getItem('jyste_last_visit')||'';
-  if(lastVisit===today)return; // 今天已經播過了
-  localStorage.setItem('jyste_last_visit',today);
-  // 延遲 1.5 秒後播報（等頁面完全載入）
-  setTimeout(()=>{
-    startSpeak();
-  },1500);
-}
-
-function toggleSpeak(){
-  if(isSpeaking){
-    stopSpeak();
-  }else{
-    startSpeak();
-  }
-}
-
-async function startSpeak(){
-  const text=buildDailyBriefing();
-  document.getElementById('speak-text').style.display='block';
-  document.getElementById('speak-text').textContent=text;
-  isSpeaking=true;
-  isTTSSpeaking=true; // 每日簡報播報期間封鎖 recognition.onend
-  document.getElementById('speak-btn').style.background='#ef4444';
-  document.getElementById('speak-btn').innerHTML='<i class="ti ti-player-pause"></i> 播報中';
-
-  // 清除休眠計時器，避免朗讀中途被強制休眠
-  if(sleepTimeout){ clearTimeout(sleepTimeout); sleepTimeout=null; }
-  window.speechSynthesis.cancel();
-
-  const ttsText=preprocessTTS(text);
-  const speed=parseFloat(document.getElementById('voice-speed').value)||1.3;
-
-  function getVoice(){
-    const v=window.speechSynthesis.getVoices();
-    return v.find(x=>x.lang==='zh-TW')||v.find(x=>x.lang.startsWith('zh'))||null;
-  }
-
-  function doSpeak(){
-    const u=new SpeechSynthesisUtterance(ttsText);
-    u.lang='zh-TW';
-    u.rate=speed;
-    u.pitch=1.05;
-    const tw=getVoice();
-    if(tw)u.voice=tw;
-    // Chrome TTS 保活：避免長文被引擎中途截斷
-    if(speakKeepAlive)clearInterval(speakKeepAlive);
-    speakKeepAlive=setInterval(()=>{
-      if(!isSpeaking){clearInterval(speakKeepAlive);speakKeepAlive=null;return;}
-      window.speechSynthesis.pause();
-      window.speechSynthesis.resume();
-    },5000);
-    u.onend=()=>{
-      if(speakKeepAlive){clearInterval(speakKeepAlive);speakKeepAlive=null;}
-      isSpeaking=false;
-      document.getElementById('speak-btn').style.background='#22c55e';
-      document.getElementById('speak-btn').innerHTML='<i class="ti ti-player-play"></i> 播報';
-      // 每日簡報播完後重置語音控制狀態
-      isSpeaking=false;
-      isTTSSpeaking=false; // 解除封鎖
-      if(_processingGuard){clearTimeout(_processingGuard);_processingGuard=null;}
-      isProcessing=false;
-      if(isAwake&&voiceCtrlActive){
-        document.getElementById('voice-ctrl-status').textContent='刀疤已喚醒 請說指令 說「再見」結束對話';
-        if(sleepTimeout)clearTimeout(sleepTimeout);
-        sleepTimeout=setTimeout(()=>{setAwakeMode(false);speakFeedback('我先休息一下 需要的時候叫我');},30000);
-      }
-      if(voiceCtrlActive&&voiceCtrlRecognition){
-        setTimeout(()=>_restartMic(), 400);
-      }
-    };
-    u.onerror=u.onend;
-    window.speechSynthesis.speak(u);
-  }
-
-  if(window.speechSynthesis.getVoices().length===0){
-    window.speechSynthesis.onvoiceschanged=doSpeak;
-  }else{
-    doSpeak();
-  }
-}
-
-function fallbackSpeak(text){
-  startSpeak();
-}
-
-function stopSpeak(){
-  if(speakKeepAlive){clearInterval(speakKeepAlive);speakKeepAlive=null;}
-  window.speechSynthesis.cancel();
-  if(currentAudio){currentAudio.pause();currentAudio=null;}
-  if(_currentTTSAudio){_currentTTSAudio.pause();_currentTTSAudio=null;}
-  isSpeaking=false;
+function _onSpeakDone(){
   isTTSSpeaking=false;
   isProcessing=false;
-  document.getElementById('speak-btn').style.background='#22c55e';
-  document.getElementById('speak-btn').innerHTML='<i class="ti ti-player-play"></i> 播報';
+  if(!voiceCtrlActive)return;
+  setTimeout(()=>_restartMic(),400);
+  if(!isAwake)return;
+  if(sleepTimeout)clearTimeout(sleepTimeout);
+  const delay=(_ideaExchangeCount>0||_ideaListening)?120000:60000;
+  sleepTimeout=setTimeout(()=>{
+    _setState('standby');
+    _speak('我先休息一下 需要的時候叫我');
+  },delay);
 }
 
-// ── 麥克風安全重啟：取代所有 try{recognition.start()}catch(e){} ─────
-function _restartMic(){
-  if(!voiceCtrlActive || !voiceCtrlRecognition) return;
-  if(isTTSSpeaking) return; // TTS 播放中，不搶音訊資源
-  try{
-    voiceCtrlRecognition.start();
-  }catch(e){
-    if(e.name === 'InvalidStateError'){
-      // 已在執行中，沒問題，忽略
-    }else{
-      // 辨識物件損壞，重新建立
-      console.warn('[刀疤] 麥克風重啟失敗，重新建立辨識物件：', e.name);
-      setTimeout(()=>{
-        if(!voiceCtrlActive) return;
-        const SR = window.SpeechRecognition||window.webkitSpeechRecognition;
-        voiceCtrlRecognition = new SR();
-        voiceCtrlRecognition.lang='zh-TW';
-        voiceCtrlRecognition.continuous=true;
-        voiceCtrlRecognition.interimResults=false;
-        setupRecognitionHandlers();
-        try{ voiceCtrlRecognition.start(); }catch(err){ console.warn('[刀疤] 重建後仍無法啟動麥克風：', err.name); }
-      }, 400);
-    }
-  }
+// ── 相容層：外部呼叫 speakFeedback/speakChain 仍可運作 ────────────
+function speakFeedback(text){
+  if(!isAwake&&text!=='我先休息一下 需要的時候叫我')return;
+  _speak(text);
 }
+async function speakChain(text){await _speak(text);}
+function _voiceChainDone(){_onSpeakDone();}
 
-// ── ElevenLabs 雲端 TTS 核心：呼叫 API 並播放音頻 ──────────
-// ElevenLabs 是否可用（連續失敗 3 次後停用 30 分鐘）
-function _isElevenAvailable(){
-  const saved=parseInt(localStorage.getItem('jyste_eleven_disabled_until')||'0');
-  if(saved>_elevenDisabledUntil)_elevenDisabledUntil=saved;
-  if(Date.now()<_elevenDisabledUntil)return false;
-  const key=localStorage.getItem('jyste_eleven_key')||'';
-  return !!key;
-}
-function _recordElevenFail(httpStatus){
-  // 401/403 = Key 失效，第一次就立即停用
-  if(httpStatus===401||httpStatus===403){
-    _elevenFailCount=99;
-  }else{
-    _elevenFailCount++;
-  }
-  if(_elevenFailCount>=3){
-    _elevenDisabledUntil=Date.now()+60*60*1000;
-    _elevenFailCount=0;
-    try{localStorage.setItem('jyste_eleven_disabled_until',String(_elevenDisabledUntil));}catch(e){}
-    console.warn('[刀疤] ElevenLabs 停用 1 小時，直接使用本機語音');
-  }
-}
-function _recordElevenSuccess(){
-  _elevenFailCount = 0;
-  _elevenDisabledUntil = 0;
-}
-
-async function _elevenTTS(text, genCheck, onEnd, onFail){
-  const key = localStorage.getItem('jyste_eleven_key')||'';
-  if(!key){ onFail(); return; }
-  try{
-    // 2 秒 fetch 超時（從 6 秒縮短）：401 應在 1 秒內回應，超過 2 秒視為網路異常
-    const controller = new AbortController();
-    const _fetchTimeout = setTimeout(()=>controller.abort(), 2000);
-    const resp = await fetch(
-      `https://api.elevenlabs.io/v1/text-to-speech/${ELEVEN_VOICE_ID}`,
-      { method:'POST',
-        headers:{'xi-api-key':key,'Content-Type':'application/json','Accept':'audio/mpeg'},
-        body:JSON.stringify({
-          text: preprocessTTS(text),
-          model_id:'eleven_turbo_v2_5',
-          voice_settings:{stability:0.5,similarity_boost:0.8,speed:1.1}
-        }),
-        signal: controller.signal
-      }
-    );
-    clearTimeout(_fetchTimeout);
-    if(!resp.ok){
-      const errMsg = `ElevenLabs HTTP ${resp.status}`;
-      console.warn('[刀疤] ElevenLabs 失敗：', errMsg);
-      throw new Error(errMsg);
-    }
-    const blob = await resp.blob();
-    if(!genCheck()){ return; }
-    const url = URL.createObjectURL(blob);
-    if(_currentTTSAudio){ _currentTTSAudio.pause(); _currentTTSAudio=null; }
-    const audio = new Audio(url);
-    _currentTTSAudio = audio;
-    audio.onended = ()=>{ URL.revokeObjectURL(url); if(_currentTTSAudio===audio)_currentTTSAudio=null; _recordElevenSuccess(); onEnd(); };
-    audio.onerror = ()=>{ URL.revokeObjectURL(url); if(_currentTTSAudio===audio)_currentTTSAudio=null; onEnd(); };
-    audio.play();
-  }catch(e){
-    console.warn('[刀疤] ElevenLabs TTS 例外：', e.message||e);
-    if(genCheck()) onFail();
-  }
-}
-
-
-// ── Google Translate TTS（免費，不需 API key，中文品質佳，通常 <1s 回應）──
-async function _googleTTS(text, genCheck, onEnd, onFail){
-  // _called 保證 onEnd/onFail 只會被呼叫一次，避免重複發聲
-  let _called=false, _tmo=null, _audio=null;
-  function _ok(){
-    if(_called)return; _called=true; clearTimeout(_tmo);
-    if(_currentTTSAudio===_audio)_currentTTSAudio=null;
-    onEnd();
-  }
-  function _fail(){
-    if(_called)return; _called=true; clearTimeout(_tmo);
-    if(_audio){try{_audio.pause();}catch(e){}}
-    if(_currentTTSAudio===_audio)_currentTTSAudio=null;
-    console.warn('[刀疤] Google TTS 失敗，切換 Chrome TTS');
-    if(genCheck()) onFail();
-  }
-  try{
-    const shortText = preprocessTTS(text).substring(0, 180);
-    if(!shortText || !genCheck()){ onFail(); return; }
-    const url = 'https://translate.google.com/translate_tts?ie=UTF-8&tl=zh-TW&client=tw-ob&q='
-              + encodeURIComponent(shortText);
-    if(_currentTTSAudio){ _currentTTSAudio.pause(); _currentTTSAudio=null; }
-    _audio = new Audio(url);
-    _currentTTSAudio = _audio;
-    _audio.onended = _ok;
-    _audio.onerror = _fail;
-    _tmo = setTimeout(_fail, 5000);
-    await _audio.play();
-  }catch(e){
-    console.warn('[刀疤] Google TTS 例外：', e.message||e);
-    _fail();
-  }
-}
+// ── ElevenLabs 存根（已停用，避免舊呼叫點出錯）────────────────────
+function _isElevenAvailable(){return false;}
+function _recordElevenFail(){}
+function _recordElevenSuccess(){}
+async function _elevenTTS(text,genCheck,onEnd,onFail){if(onFail)onFail();}
 
 // ── Chrome TTS 備援：等待聲音清單載入後再朗讀 ─────────────────
 function _chromeTTSSpeak(text, onDone){
@@ -2391,196 +2110,28 @@ function _warmupChromeTTS(){
   }
 }
 
-// ── speakFeedback：短句單次 TTS ─────────────────────────────
-function speakFeedback(text){
-  if(!isAwake && text !== '我先休息一下 需要的時候叫我') return;
-  _lastSpokenText = text;
-  _feedbackGen++;
-  const myGen = _feedbackGen;
-  // 停止目前所有音頻
-  if(_currentTTSAudio){ _currentTTSAudio.pause(); _currentTTSAudio=null; }
-  // 注意：不在這裡 cancel speechSynthesis，避免取消預熱暖機 utterance 導致 TTS 引擎重新冷啟動
-  // 若有正在播放的 keepalive 靜音字，讓它自然結束（<100ms），不影響使用者體驗
-  isTTSSpeaking = true;
-  _isTTSSpeakingSetAt = Date.now();
-  if(sleepTimeout){ clearTimeout(sleepTimeout); sleepTimeout=null; }
-  function _onEnd(){
-    if(_feedbackGen !== myGen) return;
-    isTTSSpeaking = false;
-    if(_processingGuard){ clearTimeout(_processingGuard); _processingGuard=null; }
-    isProcessing = false;
-    _restartMic(); // 統一用安全重啟函式
-    if(!isAwake) return;
-    if(sleepTimeout) clearTimeout(sleepTimeout);
-    // 朗讀進行中（speakChain）不設睡眠計時器，避免中途停止
-    if(!isTTSSpeaking){
-      const delay = (_ideaExchangeCount>0||_ideaListening) ? 120000 : 30000;
-      sleepTimeout = setTimeout(()=>{ setAwakeMode(false); speakFeedback('我先休息一下 需要的時候叫我'); }, delay);
-    }
-  }
-
-  // 12 秒安全守衛：強制解除卡住的 isTTSSpeaking 狀態
-  const _safeGuard = setTimeout(()=>{
-    if(_feedbackGen !== myGen) return;
-    console.warn('[刀疤] speakFeedback 安全守衛觸發，強制重置');
-    // 【關鍵】必須取消 Chrome TTS 排隊中的 utterance！
-    // 若不取消，Chrome TTS 可能在 10-20 秒後才播放，
-    // 此時麥克風已重啟，會把 TTS 聲音誤認成語音指令，導致語音功能故障
-    window.speechSynthesis.cancel();
-    _onEnd();        // 先清理狀態（此時 _feedbackGen===myGen，通過世代檢查）
-    _feedbackGen++;  // 再遞增，讓後續 Chrome TTS onend 不再重複呼叫 _onEnd
-  }, 12000);
-  const _onEndWithGuard = ()=>{ clearTimeout(_safeGuard); _onEnd(); };
-
-  // ElevenLabs 可用時才嘗試，連續失敗 3 次後直接用 Chrome TTS（省去等待時間）
-  function _tryGoogle(){ _googleTTS(text, ()=>_feedbackGen===myGen, _onEndWithGuard, ()=>{ if(_feedbackGen!==myGen)return; _chromeTTSSpeak(text, _onEndWithGuard); }); }
-  if(_isElevenAvailable()){
-    _elevenTTS(text, ()=>_feedbackGen===myGen, _onEndWithGuard, ()=>{
-      if(_feedbackGen !== myGen) return;
-      _recordElevenFail(_lastElevenStatus);
-      _tryGoogle();
-    });
-  } else {
-    _tryGoogle();
-  }
-}
-
-// ── _voiceChainDone：speakChain 播完後的清理 ─────────────────
-function _voiceChainDone(){
-  isTTSSpeaking = false;
-  isProcessing = false;
-  _ideaSending = false;
-  // 無論是否處於喚醒狀態，都要確保麥克風重啟（待機也需要繼續聆聽喚醒詞）
-  setTimeout(()=>_restartMic(), 400);
-  if(!isAwake) return;
-  document.getElementById('voice-ctrl-status').textContent='刀疤已喚醒 請說指令 說「再見」結束對話';
-  if(sleepTimeout) clearTimeout(sleepTimeout);
-  const delay = (_ideaExchangeCount>0||_ideaListening) ? 120000 : 60000;
-  sleepTimeout = setTimeout(()=>{
-    setAwakeMode(false);
-    speakFeedback('我先休息一下 需要的時候叫我');
-  }, delay);
-}
-
-// ── speakChain：長文 TTS（ElevenLabs 一次送完，Chrome 備援分句）──
-async function speakChain(text){
-  if(!text) return;
-  _lastSpokenText = text;
-  if(_speakChainKeepAlive){ clearInterval(_speakChainKeepAlive); _speakChainKeepAlive=null; }
-  if(_processingGuard){ clearTimeout(_processingGuard); _processingGuard=null; }
-  _speakChainGen++;
-  const myGen = _speakChainGen;
-  isTTSSpeaking = true;
-  _isTTSSpeakingSetAt = Date.now();
-  if(sleepTimeout){ clearTimeout(sleepTimeout); sleepTimeout=null; }
-  _feedbackGen++;
-  if(_currentTTSAudio){ _currentTTSAudio.pause(); _currentTTSAudio=null; }
-
-  // 看門狗：每句讀完後重設計時，避免被20秒看門狗誤殺
-  function _tickWatchdog(){ _isTTSSpeakingSetAt = Date.now(); }
-
-  // Google TTS 包裝成 Promise
-  function _googleTTSAsync(chunk){
-    return new Promise(resolve=>{
-      _googleTTS(chunk, ()=>_speakChainGen===myGen, ()=>resolve(true), ()=>resolve(false));
-    });
-  }
-
-  // Chrome TTS 包裝成 Promise（加60秒安全超時，避免 callback 遺失造成卡死）
-  function _chromeTTSAsync(chunk){
-    return new Promise(resolve=>{
-      let _resolved = false;
-      const _safeTimeout = setTimeout(()=>{
-        if(!_resolved){ _resolved=true; console.warn('[刀疤] _chromeTTSAsync 60秒超時，強制繼續'); resolve(true); }
-      }, 60000);
-      _chromeTTSSpeak(chunk, ()=>{
-        if(!_resolved){ _resolved=true; clearTimeout(_safeTimeout); resolve(true); }
-      });
-    });
-  }
-
-  // ElevenLabs 包裝成 Promise
-  function _elevenTTSAsync(){
-    return new Promise(resolve=>{
-      _elevenTTS(text, ()=>_speakChainGen===myGen, ()=>resolve(true), ()=>resolve(false));
-    });
-  }
-
-  // ElevenLabs 可用時先嘗試
-  if(_isElevenAvailable()){
-    const elevenOk = await _elevenTTSAsync();
-    if(_speakChainGen!==myGen) return;
-    if(elevenOk){ _voiceChainDone(); return; }
-    _recordElevenFail(_lastElevenStatus);
-  }
-
-  // 分句朗讀：用 for 迴圈 + await，邏輯清晰，不會有 callback 遺失問題
-  const chunks = text.split(/(?<=[。！？!?\n])/g).map(s=>s.trim()).filter(s=>s.length>0);
-  if(chunks.length===0){ _voiceChainDone(); return; }
-
-  for(let i=0; i<chunks.length; i++){
-    if(_speakChainGen!==myGen) return; // 被使用者語音指令「停」取消
-
-    const chunk = chunks[i];
-
-    // 先試 Google TTS
-    const googleOk = await _googleTTSAsync(chunk);
-    if(_speakChainGen!==myGen) return;
-
-    // Google 失敗則用 Chrome TTS
-    if(!googleOk){
-      await _chromeTTSAsync(chunk);
-      if(_speakChainGen!==myGen) return;
-    }
-
-    _tickWatchdog(); // 每句讀完，重設看門狗計時
-  }
-
-  // 全部讀完
-  if(_speakChainGen===myGen) _voiceChainDone();
-}
-
-
-// ── 語音控制（持續對話版）──────────────────────────
-let voiceCtrlActive=false;
+// ── 語音控制（v3.82 狀態機版）──────────────────────────────────────
 let voiceCtrlRecognition=null;
-let isAwake=false;          // 是否已喚醒進入對話模式
-let sleepTimeout=null;      // 30秒無動作自動休眠
-let isProcessing=false;     // 防止重複執行
+let sleepTimeout=null;   // 相容舊程式碼（_onSpeakDone 等仍用此名）
+let _processingGuard=null; // 相容 executeVoiceCommand
 
 function toggleVoiceControl(){
-  if(voiceCtrlActive){
-    stopVoiceControl();
-  }else{
-    startVoiceControl();
-  }
+  if(voiceCtrlActive){stopVoiceControl();}else{startVoiceControl();}
 }
 
 function setAwakeMode(awake){
-  isAwake=awake;
   if(awake){
-    // 喚醒狀態：綠色
-    document.getElementById('voice-ctrl-btn').style.background='#14532d';
-    document.getElementById('voice-ctrl-btn').style.borderColor='#22c55e';
-    document.getElementById('voice-ctrl-btn').style.color='#22c55e';
-    document.getElementById('voice-ctrl-status').textContent='小秘已喚醒 請說指令 說「再見」結束對話';
-    // 沒有任務進行中才啟動計時；有任務時等任務完成後再計時
+    _setState('awake');
     if(sleepTimeout)clearTimeout(sleepTimeout);
-    if(!isProcessing && !isTTSSpeaking){
-      // 朗讀中（speakChain）不設睡眠計時器
+    if(!isProcessing&&!isTTSSpeaking){
       sleepTimeout=setTimeout(()=>{
-        setAwakeMode(false);
-        speakFeedback('我先休息一下 需要的時候叫我');
+        _setState('standby');
+        _speak('我先休息一下 需要的時候叫我');
       },60000);
     }
   }else{
-    // 待機狀態：藍色
-    document.getElementById('voice-ctrl-btn').style.background='#1e3a5f';
-    document.getElementById('voice-ctrl-btn').style.borderColor='#3b82f6';
-    document.getElementById('voice-ctrl-btn').style.color='#93c5fd';
-    document.getElementById('voice-ctrl-status').textContent='語音控制已開啟 說「刀疤」喚醒我';
-    document.getElementById('voice-ctrl-result').textContent='';
-    if(sleepTimeout)clearTimeout(sleepTimeout);
+    _setState('standby');
+    if(sleepTimeout){clearTimeout(sleepTimeout);sleepTimeout=null;}
   }
 }
 
@@ -2593,80 +2144,34 @@ function startVoiceControl(){
   voiceCtrlRecognition=new SR();
   voiceCtrlRecognition.lang='zh-TW';
   voiceCtrlRecognition.continuous=true;
-  voiceCtrlRecognition.interimResults=false; // 只取最終結果，更準確
+  voiceCtrlRecognition.interimResults=false;
 
   voiceCtrlRecognition.onstart=()=>{
-    voiceCtrlActive=true;
-    document.getElementById('voice-ctrl-btn').style.background='#1e3a5f';
-    document.getElementById('voice-ctrl-btn').style.borderColor='#3b82f6';
-    document.getElementById('voice-ctrl-btn').style.color='#93c5fd';
+    _setState('standby');
     document.getElementById('voice-ctrl-bar').style.display='flex';
-    document.getElementById('voice-ctrl-status').textContent='語音控制已開啟 說「刀疤」喚醒我';
-    document.getElementById('voice-ctrl-result').textContent='';
   };
 
   setupRecognitionHandlers();
   voiceCtrlRecognition.start();
-
-  // 語音控制啟動時立即預熱 Chrome TTS 引擎（確保第一句回覆不會冷啟動）
   _warmupChromeTTS();
-
-  // Chrome TTS 引擎保活：每 30s 說一個靜音字，真正讓引擎維持在熱身狀態
-  // （resume() 對未暫停的引擎無效，必須實際 speak() 才能防止冷啟動）
-  if(_ttsEngineKeepAlive) clearInterval(_ttsEngineKeepAlive);
-  _ttsEngineKeepAlive = setInterval(()=>{
-    if(voiceCtrlActive && !isTTSSpeaking && !window.speechSynthesis.speaking){
-      const u = new SpeechSynthesisUtterance('待命');
-      u.volume = 0; u.rate = 3; u.lang = 'zh-TW';
-      u.onend = ()=>{}; u.onerror = ()=>{};
-      window.speechSynthesis.speak(u);
-    }
-  }, 10000);
-
-  // ── 全域看門狗：每 5 秒檢查 isTTSSpeaking 是否卡死超過 20 秒 ─────
-  // （任何其他守衛都漏網的情況，這是最後防線）
-  const _watchdog = setInterval(()=>{
-    if(!voiceCtrlActive){ clearInterval(_watchdog); return; }
-    if(isTTSSpeaking && _isTTSSpeakingSetAt > 0 && Date.now()-_isTTSSpeakingSetAt > 45000){
-      console.warn('[刀疤] 全域看門狗觸發：isTTSSpeaking 卡死超過 20 秒，強制重置所有狀態');
-      // 強制停止所有音頻
-      if(_currentTTSAudio){ _currentTTSAudio.pause(); _currentTTSAudio=null; }
-      window.speechSynthesis.cancel();
-      // 遞增世代，廢棄所有進行中的 TTS 回調
-      _feedbackGen++;
-      _speakChainGen++;
-      if(_speakChainKeepAlive){ clearInterval(_speakChainKeepAlive); _speakChainKeepAlive=null; }
-      // 重置所有狀態
-      isTTSSpeaking = false;
-      isProcessing = false;
-      if(_processingGuard){ clearTimeout(_processingGuard); _processingGuard=null; }
-      // 重啟麥克風
-      _restartMic();
-      // 更新 UI
-      if(isAwake){
-        document.getElementById('voice-ctrl-status').textContent='刀疤已喚醒 請說指令 說「再見」結束對話';
-        if(sleepTimeout) clearTimeout(sleepTimeout);
-        sleepTimeout = setTimeout(()=>{ setAwakeMode(false); speakFeedback('我先休息一下 需要的時候叫我'); }, 30000);
-      }
-    }
-  }, 5000);
-  // 看門狗 ID 存入全域，stopVoiceControl 時清除
-  _voiceWatchdog = _watchdog;
 }
 
 function stopVoiceControl(){
-  voiceCtrlActive=false;
-  isAwake=false;
-  isProcessing=false;
-  if(sleepTimeout)clearTimeout(sleepTimeout);
-  if(_ttsEngineKeepAlive){clearInterval(_ttsEngineKeepAlive);_ttsEngineKeepAlive=null;}
-  if(_voiceWatchdog){clearInterval(_voiceWatchdog);_voiceWatchdog=null;}
+  _cancelTTS();
+  _setState('off');
+  if(sleepTimeout){clearTimeout(sleepTimeout);sleepTimeout=null;}
+  if(_processingGuard){clearTimeout(_processingGuard);_processingGuard=null;}
   if(voiceCtrlRecognition)voiceCtrlRecognition.stop();
-  document.getElementById('voice-ctrl-btn').style.background='';
-  document.getElementById('voice-ctrl-btn').style.borderColor='';
-  document.getElementById('voice-ctrl-btn').style.color='var(--text2)';
-  document.getElementById('voice-ctrl-bar').style.display='none';
   showToast('語音控制已關閉');
+}
+
+function resetProcessingState(){
+  isProcessing=false;
+  if(_processingGuard){clearTimeout(_processingGuard);_processingGuard=null;}
+  if(isAwake&&voiceCtrlActive){
+    document.getElementById('voice-ctrl-status').textContent='刀疤已喚醒 請說指令 說「再見」結束對話';
+  }
+  _restartMic();
 }
 
 // ── 語音新增待辦 ──────────────────────────────────
@@ -2772,7 +2277,6 @@ function voiceAddTodo(taskRaw){
   document.getElementById('voice-ctrl-status').textContent=`待確認：${task}${date?' | '+date:''}`;
 }
 
-let _processingGuard=null;
 function resetProcessingState(){
   isProcessing=false;
   if(_processingGuard){clearTimeout(_processingGuard);_processingGuard=null;}
@@ -3066,35 +2570,12 @@ function executeVoiceCommand(cmd){
     if(sleepTimeout){clearTimeout(sleepTimeout);sleepTimeout=null;}
     const goodbyes=['好的 有需要再叫我 再見 bruce哥','掰掰 bruce哥 有事找我','好 我先待命 需要的時候叫我'];
     const msg=goodbyes[Math.floor(Math.random()*goodbyes.length)];
-    setAwakeMode(false); // 先切換待機狀態
-    _feedbackGen++;
-    const myGen=_feedbackGen;
-    isTTSSpeaking=true;
-    // 8 秒安全守衛
-    const _byeGuard=setTimeout(()=>{
-      if(_feedbackGen!==myGen)return;
-      _feedbackGen++;
-      isTTSSpeaking=false; isProcessing=false;
+    _setState('standby'); // 切換待機（isAwake=false），但語音控制繼續
+    // 用 _speak 直接播放道別語，結束後自動重啟麥克風
+    isTTSSpeaking=true; // 確保播放期間不接收新指令
+    _speak(msg).then(()=>{
+      isTTSSpeaking=false;
       _restartMic();
-    },8000);
-    function _onByeEnd(){
-      clearTimeout(_byeGuard);
-      if(_feedbackGen!==myGen)return;
-      isTTSSpeaking=false; isProcessing=false;
-      _restartMic();
-    }
-    // 優先 ElevenLabs，失敗備援 Chrome TTS
-    _elevenTTS(msg, ()=>_feedbackGen===myGen, _onByeEnd, ()=>{
-      if(_feedbackGen!==myGen)return;
-      if(_currentTTSAudio){_currentTTSAudio.pause();_currentTTSAudio=null;}
-      window.speechSynthesis.cancel();
-      const u=new SpeechSynthesisUtterance(preprocessTTS(msg));
-      u.lang='zh-TW'; u.rate=1.2; u.pitch=1.05;
-      const tw=window.speechSynthesis.getVoices().find(v=>v.lang==='zh-TW')||null;
-      if(tw)u.voice=tw;
-      u.onend=_onByeEnd;
-      u.onerror=(e)=>{if(e.error==='canceled'||e.error==='interrupted')return; _onByeEnd();};
-      window.speechSynthesis.speak(u);
     });
   }
 
