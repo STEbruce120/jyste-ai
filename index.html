@@ -989,56 +989,43 @@ async function loadNews(voiceMode=false){
     const rssFeeds=[
       {cat:'台灣經濟/商業',cls:'cat-tw',
        urls:['https://www.bnext.com.tw/rss',
+             'https://ctee.com.tw/feed',
              GN+encodeURIComponent('台灣 商業 經濟')]},
       {cat:'科技/AI',cls:'cat-tech',
        urls:['https://technews.tw/feed/',
+             'https://ithome.com.tw/rss',
              GN+encodeURIComponent('AI 人工智慧 科技')]},
       {cat:'製造業/自動化',cls:'cat-mfg',
        urls:['https://www.digitimes.com.tw/rss/rss.asp',
-             GN+encodeURIComponent('製造業 自動化 台灣')]},
+             GN+encodeURIComponent('製造業 自動化 智慧工廠 台灣')]},
       {cat:'國內財經',cls:'cat-finance',
-       urls:['https://udn.com/rssfeed/news/2/6644?ch=money',
-             'https://www.cnyes.com/rss/cat/headline',
-             GN+encodeURIComponent('台灣 股市 財經 投資 金融')]},
+       urls:['https://ec.ltn.com.tw/rss/news.xml',
+             'https://www.moneydj.com/KMDJ/RSS/RSSReaderFull.aspx?param=mb020000',
+             GN+encodeURIComponent('台灣 股市 財經 投資 上市')]},
       {cat:'國際財經',cls:'cat-global',
-       urls:['https://www.cnyes.com/rss/cat/fd_intl_futures',
-             'https://ec.ltn.com.tw/rss/business.xml',
-             GN+encodeURIComponent('國際 財經 美股 金融 外匯')]}
+       urls:['https://ec.ltn.com.tw/rss/business.xml',
+             'https://feeds.bbci.co.uk/zhongwen/trad/business/rss.xml',
+             GN+encodeURIComponent('國際 財經 美股 聯準會 全球經濟')]}
     ];
 
-    async function fetchRSS(url){
-      const proxies=[
-        `https://corsproxy.io/?${encodeURIComponent(url)}`,
-        `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`
-      ];
-      for(const proxy of proxies){
-        try{
-          const r=await fetch(proxy,{signal:AbortSignal.timeout(5000)});
-          if(!r.ok)continue;
-          const txt=await r.text();
-          const xml=new DOMParser().parseFromString(txt,'text/xml');
-          if(!xml.querySelector('parsererror'))return xml;
-        }catch(e){}
-      }
-      return null;
-    }
-
+    // 使用 rss2json.com API（專為 RSS 轉 JSON 設計，CORS 友善，免費）
     async function fetchFeed(feed){
       for(const url of feed.urls){
-        const xml=await fetchRSS(url);
-        if(!xml)continue;
-        const items=[...xml.querySelectorAll('item')].slice(0,2);
-        const chanTitle=xml.querySelector('channel>title')?.textContent||feed.cat;
-        const parsed=items.map(item=>{
-          const title=item.querySelector('title')?.textContent?.trim()||'';
-          if(!title)return null;
-          const link=item.querySelector('link')?.textContent?.trim()||
-                     item.querySelector('link')?.nextSibling?.textContent?.trim()||'';
-          const desc=(item.querySelector('description')?.textContent||'').replace(/<[^>]*>/g,'').trim().slice(0,120);
-          const pub=item.querySelector('pubDate')?.textContent||'';
-          return {cat:feed.cat,cls:feed.cls,title,source:chanTitle,summary:desc,url:link,publishedAt:pub};
-        }).filter(Boolean);
-        if(parsed.length>0)return parsed;
+        try{
+          const apiUrl=`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(url)}&count=3`;
+          const r=await fetch(apiUrl,{signal:AbortSignal.timeout(7000)});
+          if(!r.ok)continue;
+          const data=await r.json();
+          if(data.status!=='ok'||!data.items?.length)continue;
+          const parsed=data.items.slice(0,2).map(item=>{
+            const title=(item.title||'').trim();
+            if(!title)return null;
+            const desc=(item.description||item.content||'').replace(/<[^>]*>/g,'').trim().slice(0,120);
+            return {cat:feed.cat,cls:feed.cls,title,source:data.feed?.title||feed.cat,
+                    summary:desc,url:item.link||'',publishedAt:item.pubDate||''};
+          }).filter(Boolean);
+          if(parsed.length>0)return parsed;
+        }catch(e){}
       }
       return [];
     }
