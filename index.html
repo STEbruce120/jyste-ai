@@ -1306,8 +1306,7 @@ async function _extractPDF(file){
   for(let i=1;i<=maxPages;i++){
     const page=await pdf.getPage(i);
     const tc=await page.getTextContent();
-    text+=tc.items.map(it=>it.str).join(' ')+'
-';
+    text+=tc.items.map(it=>it.str).join(' ')+'\n';
   }
   return text;
 }
@@ -1329,14 +1328,8 @@ async function processMeeting(){
   try{
     // 組合參考文件區塊
     const docSection=_meetingDocs.length>0
-      ?`
-
-【會議前參考文件】（請結合以下文件內容，讓摘要和待辦更精確）
-`
-        +_meetingDocs.map((d,i)=>`--- 文件${i+1}：${d.name} ---
-${d.content}`).join('
-
-')
+      ?'\n\n【會議前參考文件】（請結合以下文件內容，讓摘要和待辦更精確）\n'
+        +_meetingDocs.map((d,i)=>'--- 文件'+(i+1)+'：'+d.name+' ---\n'+d.content).join('\n\n')
       :'';
 
     const res=await callGemini(`你是鈞曜科技有限公司（物料管理設備製造商，產品：垂直式/旋轉式自動倉儲）總經理的AI秘書。請整理以下會議記錄，用繁體中文回覆。${_meetingDocs.length>0?'本次附有'+_meetingDocs.length+'份參考文件，請結合文件內容讓摘要更完整、待辦更具體。':''}
