@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>鈞曜科技 AI 秘書 v3.95</title>
+<title>鈞曜科技 AI 秘書 v3.96</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
@@ -253,7 +253,7 @@ input:focus { outline: none; border-color: var(--info) !important; }
     <div class="logo"><i class="ti ti-robot"></i></div>
     <div class="header-text">
       <h1>鈞曜科技 AI 秘書</h1>
-      <p>會議記錄 ・ 待辦追蹤 ・ 每日晨報 ・ Outlook &nbsp;<span style="font-size:11px;background:#22c55e22;color:#22c55e;border:1px solid #22c55e44;border-radius:20px;padding:1px 8px;vertical-align:middle">v3.95</span></p>
+      <p>會議記錄 ・ 待辦追蹤 ・ 每日晨報 ・ Outlook &nbsp;<span style="font-size:11px;background:#22c55e22;color:#22c55e;border:1px solid #22c55e44;border-radius:20px;padding:1px 8px;vertical-align:middle">v3.96</span></p>
     </div>
     <div class="header-right" style="display:flex;gap:8px;align-items:center">
       <div class="api-status ok" id="api-status"><i class="ti ti-check"></i> AI 已連線</div>
@@ -785,11 +785,9 @@ function setupRecognitionHandlers(){
 
   voiceCtrlRecognition.onend=()=>{
     if(!voiceCtrlActive) return;
-    if(isTTSSpeaking){
-      // TTS 播放中，先不搶音訊資源，等 TTS 結束時的 _restartMic() 負責重啟
-      return;
-    }
-    setTimeout(()=>_restartMic(), 300);
+    if(isTTSSpeaking) return; // TTS 播放中，等 _onSpeakDone 重啟
+    if(_micRestartScheduled) return; // _onSpeakDone 已排程重啟，避免重複
+    setTimeout(()=>_restartMic(), 500);
   };
 }
 
@@ -836,8 +834,10 @@ let _voiceNewsItems=[];  // 儲存最近載入的新聞，供語音分析使用
 let _meetingDocs=[];   // 會議前上傳的參考文件 [{name,content}]
 let _lastSpokenText='';  // 記住最後一句話，供「重複」指令使用
 let _completedToday=[];  // 本次開啟後完成的待辦，供晚間簡報使用
-// ── 語音狀態機全域變數 (v3.95) ──────────────────────────────────
+// ── 語音狀態機全域變數 (v3.96) ──────────────────────────────────
 let _voiceState='off';      // 'off'|'standby'|'awake'|'processing'|'speaking'
+let _lastMicStart=0;        // 防止短時間大量 start() 被 Chrome 封鎖
+let _micRestartScheduled=false; // 防止 onend 和 _onSpeakDone 同時重啟
 let _ttsGen=0;              // 遞增取消正在播放的 TTS
 // 相容舊程式碼的讀取變數（只由 _setState 寫入）
 let isTTSSpeaking=false;
@@ -2071,7 +2071,7 @@ function switchTab(tab){
   document.getElementById('tab-'+tab).classList.add('active');
 }
 
-// ── 語音狀態機核心 (v3.95) ──────────────────────────────────────
+// ── 語音狀態機核心 (v3.96) ──────────────────────────────────────
 // ElevenLabs 已停用（長期 HTTP 401，只造成延遲與不穩定）
 
 const ELEVEN_VOICE_ID=''; // 已停用
@@ -2317,7 +2317,8 @@ function _onSpeakNowDone(){
   isTTSSpeaking=false;
   isProcessing=false;
   if(!voiceCtrlActive) return;
-  setTimeout(()=>_restartMic(), 300);
+  _micRestartScheduled=true; // 告知 onend 不需要再重啟
+  setTimeout(()=>_restartMic(), 600);
   if(!isAwake) return;
   _updateVoiceUI(); // 刷新狀態文字
   if(sleepTimeout) clearTimeout(sleepTimeout);
@@ -2361,7 +2362,8 @@ function _onSpeakDone(){
   isTTSSpeaking=false;
   isProcessing=false;
   if(!voiceCtrlActive)return;
-  setTimeout(()=>_restartMic(),400);
+  _micRestartScheduled=true; // 告知 onend 不需要再重啟
+  setTimeout(()=>_restartMic(),600);
   if(!isAwake)return;
   _updateVoiceUI(); // 刷新狀態文字，清除「查詢中...」等暫時提示
   if(sleepTimeout)clearTimeout(sleepTimeout);
@@ -2514,7 +2516,7 @@ function _warmupChromeTTS(){
   }
 }
 
-// ── 語音控制（v3.95 狀態機版）──────────────────────────────────────
+// ── 語音控制（v3.96 狀態機版）──────────────────────────────────────
 let voiceCtrlRecognition=null;
 let sleepTimeout=null;   // 相容舊程式碼（_onSpeakDone 等仍用此名）
 let _processingGuard=null; // 相容 executeVoiceCommand
@@ -2572,30 +2574,37 @@ function stopVoiceControl(){
   showToast('語音控制已關閉');
 }
 
-// ── 麥克風安全重啟（v3.82 遺失，v3.95 補回）─────────────────────────
+// ── 麥克風安全重啟（防抖：最短 1.5 秒間隔，避免 Chrome 封鎖）────────
 function _restartMic(){
   if(!voiceCtrlActive||!voiceCtrlRecognition)return;
-  if(isTTSSpeaking)return; // TTS 播放中，不搶音訊資源
-  try{
-    voiceCtrlRecognition.start();
-  }catch(e){
-    if(e.name==='InvalidStateError'){
-      // 已在執行中，忽略
-    }else{
-      // 辨識物件損壞，重新建立
-      console.warn('[刀疤] 麥克風重啟失敗，重新建立：', e.name);
-      setTimeout(()=>{
-        if(!voiceCtrlActive)return;
-        const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-        voiceCtrlRecognition=new SR();
-        voiceCtrlRecognition.lang='zh-TW';
-        voiceCtrlRecognition.continuous=true;
-        voiceCtrlRecognition.interimResults=false;
-        setupRecognitionHandlers();
-        try{voiceCtrlRecognition.start();}catch(err){console.warn('[刀疤] 重建後仍失敗：',err.name);}
-      },400);
+  if(isTTSSpeaking)return;
+  _micRestartScheduled=false;
+  const now=Date.now();
+  const gap=now-_lastMicStart;
+  const delay=gap<1500?1500-gap:0; // 距上次 start 不足 1.5 秒則等待
+  setTimeout(()=>{
+    if(!voiceCtrlActive||isTTSSpeaking)return;
+    try{
+      voiceCtrlRecognition.start();
+      _lastMicStart=Date.now();
+    }catch(e){
+      if(e.name==='InvalidStateError'){
+        _lastMicStart=Date.now(); // 已在執行中，更新時間戳
+      }else{
+        console.warn('[刀疤] 麥克風重啟失敗，重新建立：',e.name);
+        setTimeout(()=>{
+          if(!voiceCtrlActive)return;
+          const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+          voiceCtrlRecognition=new SR();
+          voiceCtrlRecognition.lang='zh-TW';
+          voiceCtrlRecognition.continuous=true;
+          voiceCtrlRecognition.interimResults=false;
+          setupRecognitionHandlers();
+          try{voiceCtrlRecognition.start();_lastMicStart=Date.now();}catch(err){}
+        },800);
+      }
     }
-  }
+  }, delay);
 }
 
 function resetProcessingState(){
