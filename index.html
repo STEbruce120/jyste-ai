@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>鈞曜科技 AI 秘書 v3.93</title>
+<title>鈞曜科技 AI 秘書 v3.94</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
@@ -253,7 +253,7 @@ input:focus { outline: none; border-color: var(--info) !important; }
     <div class="logo"><i class="ti ti-robot"></i></div>
     <div class="header-text">
       <h1>鈞曜科技 AI 秘書</h1>
-      <p>會議記錄 ・ 待辦追蹤 ・ 每日晨報 ・ Outlook &nbsp;<span style="font-size:11px;background:#22c55e22;color:#22c55e;border:1px solid #22c55e44;border-radius:20px;padding:1px 8px;vertical-align:middle">v3.93</span></p>
+      <p>會議記錄 ・ 待辦追蹤 ・ 每日晨報 ・ Outlook &nbsp;<span style="font-size:11px;background:#22c55e22;color:#22c55e;border:1px solid #22c55e44;border-radius:20px;padding:1px 8px;vertical-align:middle">v3.94</span></p>
     </div>
     <div class="header-right" style="display:flex;gap:8px;align-items:center">
       <div class="api-status ok" id="api-status"><i class="ti ti-check"></i> AI 已連線</div>
@@ -836,7 +836,7 @@ let _voiceNewsItems=[];  // 儲存最近載入的新聞，供語音分析使用
 let _meetingDocs=[];   // 會議前上傳的參考文件 [{name,content}]
 let _lastSpokenText='';  // 記住最後一句話，供「重複」指令使用
 let _completedToday=[];  // 本次開啟後完成的待辦，供晚間簡報使用
-// ── 語音狀態機全域變數 (v3.93) ──────────────────────────────────
+// ── 語音狀態機全域變數 (v3.94) ──────────────────────────────────
 let _voiceState='off';      // 'off'|'standby'|'awake'|'processing'|'speaking'
 let _ttsGen=0;              // 遞增取消正在播放的 TTS
 // 相容舊程式碼的讀取變數（只由 _setState 寫入）
@@ -877,6 +877,19 @@ async function testAPI(){
 }
 
 // ── Init ──────────────────────────────────────────
+async 
+// ── 語音狀態看門狗（每12秒自動解除卡住的 isProcessing）─────────────
+setInterval(()=>{
+  if(!voiceCtrlActive) return;
+  if(isProcessing && !isTTSSpeaking){
+    // isProcessing=true 但沒有 TTS 在跑，可能卡住了
+    console.warn('[刀疤] 偵測到 isProcessing 卡住，強制重設');
+    isProcessing=false;
+    _updateVoiceUI();
+    setTimeout(()=>_restartMic(),200);
+  }
+}, 12000);
+
 async function init(){
   // API Key 已內建，無需手動設定
   apiKey=localStorage.getItem('jyste_groq_key')||'';
@@ -2054,7 +2067,7 @@ function switchTab(tab){
   document.getElementById('tab-'+tab).classList.add('active');
 }
 
-// ── 語音狀態機核心 (v3.93) ──────────────────────────────────────
+// ── 語音狀態機核心 (v3.94) ──────────────────────────────────────
 // ElevenLabs 已停用（長期 HTTP 401，只造成延遲與不穩定）
 
 const ELEVEN_VOICE_ID=''; // 已停用
@@ -2301,7 +2314,10 @@ function _onSpeakNowDone(){
 
 // ── 核心朗讀（取代 speakFeedback + speakChain）────────────────────
 async function _speak(text){
-  if(!text||_voiceState==='off')return;
+  if(!text||_voiceState==='off'){
+    isProcessing=false; // 防止卡住
+    return;
+  }
   _lastSpokenText=text;
   const myGen=++_ttsGen;
   isTTSSpeaking=true;
@@ -2346,7 +2362,11 @@ function _onSpeakDone(){
 
 // ── 相容層：外部呼叫 speakFeedback/speakChain 仍可運作 ────────────
 function speakFeedback(text){
-  if(!isAwake&&text!=='我先休息一下 需要的時候叫我')return;
+  if(!isAwake&&text!=='我先休息一下 需要的時候叫我'){
+    isProcessing=false; // 防止 isProcessing 卡住（isAwake=false 時靜默丟棄訊息）
+    setTimeout(()=>_restartMic(),200);
+    return;
+  }
   _speakNow(text); // 短句回饋用 Chrome TTS，確保即時播放
 }
 async function speakChain(text){await _speak(text);}
@@ -2482,7 +2502,7 @@ function _warmupChromeTTS(){
   }
 }
 
-// ── 語音控制（v3.93 狀態機版）──────────────────────────────────────
+// ── 語音控制（v3.94 狀態機版）──────────────────────────────────────
 let voiceCtrlRecognition=null;
 let sleepTimeout=null;   // 相容舊程式碼（_onSpeakDone 等仍用此名）
 let _processingGuard=null; // 相容 executeVoiceCommand
@@ -2540,7 +2560,7 @@ function stopVoiceControl(){
   showToast('語音控制已關閉');
 }
 
-// ── 麥克風安全重啟（v3.82 遺失，v3.93 補回）─────────────────────────
+// ── 麥克風安全重啟（v3.82 遺失，v3.94 補回）─────────────────────────
 function _restartMic(){
   if(!voiceCtrlActive||!voiceCtrlRecognition)return;
   if(isTTSSpeaking)return; // TTS 播放中，不搶音訊資源
@@ -2678,15 +2698,6 @@ function voiceAddTodo(taskRaw){
 
   speakFeedback(msg);
   document.getElementById('voice-ctrl-status').textContent=`待確認：${task}${date?' | '+date:''}`;
-}
-
-function resetProcessingState(){
-  isProcessing=false;
-  if(_processingGuard){clearTimeout(_processingGuard);_processingGuard=null;}
-  if(isAwake&&voiceCtrlActive){
-    document.getElementById('voice-ctrl-status').textContent='刀疤已喚醒 請說指令 說「再見」結束對話';
-  }
-  _restartMic();
 }
 
 function executeVoiceCommand(cmd){
