@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>鈞曜科技 AI 秘書 v3.74</title>
+<title>鈞曜科技 AI 秘書 v3.75</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
@@ -253,7 +253,7 @@ input:focus { outline: none; border-color: var(--info) !important; }
     <div class="logo"><i class="ti ti-robot"></i></div>
     <div class="header-text">
       <h1>鈞曜科技 AI 秘書</h1>
-      <p>會議記錄 ・ 待辦追蹤 ・ 每日晨報 ・ Outlook &nbsp;<span style="font-size:11px;background:#22c55e22;color:#22c55e;border:1px solid #22c55e44;border-radius:20px;padding:1px 8px;vertical-align:middle">v3.74</span></p>
+      <p>會議記錄 ・ 待辦追蹤 ・ 每日晨報 ・ Outlook &nbsp;<span style="font-size:11px;background:#22c55e22;color:#22c55e;border:1px solid #22c55e44;border-radius:20px;padding:1px 8px;vertical-align:middle">v3.75</span></p>
     </div>
     <div class="header-right" style="display:flex;gap:8px;align-items:center">
       <div class="api-status ok" id="api-status"><i class="ti ti-check"></i> AI 已連線</div>
@@ -577,7 +577,8 @@ input:focus { outline: none; border-color: var(--info) !important; }
       <div class="modal-title" id="modal-title"></div>
       <button class="icon-btn" onclick="closeModal()"><i class="ti ti-x"></i></button>
     </div>
-    <div id="modal-body" style="font-size:14px;line-height:1.8;white-space:pre-wrap"></div>
+    <div id="modal-ref-docs" style="display:none;align-items:center;gap:6px;font-size:12px;color:var(--purple);background:rgba(124,58,237,0.08);padding:7px 12px;border-radius:var(--radius-sm);margin-bottom:10px;flex-wrap:wrap"></div>
+      <div id="modal-body" style="font-size:14px;line-height:1.8;white-space:pre-wrap"></div>
   </div>
 </div>
 
@@ -1368,11 +1369,19 @@ ${input}${docSection}`);
     document.getElementById('meeting-result').textContent=display;
     if(lastExtractedTodos.length>0)document.getElementById('import-row').style.display='block';
     const title=input.substring(0,30)+(input.length>30?'...':'');
-    const newMeeting={id:Date.now(),title,date:new Date().toLocaleDateString('zh-TW'),content:display};
+    // 記錄參考文件名稱（只存名稱，不存內容）
+    const refDocs=_meetingDocs.map(d=>d.name);
+    const newMeeting={id:Date.now(),title,date:new Date().toLocaleDateString('zh-TW'),content:display,refDocs};
     meetings.unshift(newMeeting);
     if(meetings.length>30)meetings.pop();
     sbInsert('meetings',newMeeting).catch(()=>{});
     saveData();renderHistory();
+    // 整理完成後清除參考文件（內容不保留，只有名稱已存入紀錄）
+    if(_meetingDocs.length>0){
+      _meetingDocs=[];
+      renderMeetingDocs();
+      showToast('✅ 整理完成，參考文件已清除');
+    }
   }catch(e){
     document.getElementById('meeting-result').style.display='block';
     document.getElementById('meeting-result').textContent='⚠️ 錯誤：'+e.message;
@@ -1697,6 +1706,7 @@ function renderHistory(){
   list.innerHTML=meetings.map(m=>`
     <div class="history-item" onclick="openModal(${m.id})">
       <div class="history-title">${m.title}</div>
+      ${m.refDocs&&m.refDocs.length?`<div style="font-size:11px;color:var(--purple);margin-top:2px;display:flex;align-items:center;gap:4px"><i class="ti ti-paperclip" style="font-size:11px"></i>${m.refDocs.join('、')}</div>`:''}
       <div class="history-date"><i class="ti ti-calendar" style="font-size:12px"></i> ${m.date}</div>
       <div class="history-preview">${m.content.substring(0,80)}...</div>
     </div>`).join('');
@@ -1706,6 +1716,16 @@ function openModal(id){
   const m=meetings.find(m=>m.id===id);if(!m)return;
   document.getElementById('modal-title').textContent=m.title;
   document.getElementById('modal-body').textContent=m.content;
+  // 顯示參考文件名稱（如有）
+  const refEl=document.getElementById('modal-ref-docs');
+  if(refEl){
+    if(m.refDocs&&m.refDocs.length){
+      refEl.innerHTML='<i class="ti ti-paperclip"></i> 本次參考文件：'+m.refDocs.join('、');
+      refEl.style.display='flex';
+    }else{
+      refEl.style.display='none';
+    }
+  }
   document.getElementById('history-modal').classList.add('open');
 }
 function closeModal(){document.getElementById('history-modal').classList.remove('open');}
