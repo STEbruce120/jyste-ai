@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>鈞曜科技 AI 秘書 v3.66</title>
+<title>鈞曜科技 AI 秘書 v3.67</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
 <style>
@@ -211,7 +211,7 @@ input:focus { outline: none; border-color: var(--info) !important; }
     <div class="logo"><i class="ti ti-robot"></i></div>
     <div class="header-text">
       <h1>鈞曜科技 AI 秘書</h1>
-      <p>會議記錄 ・ 待辦追蹤 ・ 每日晨報 ・ Outlook &nbsp;<span style="font-size:11px;background:#22c55e22;color:#22c55e;border:1px solid #22c55e44;border-radius:20px;padding:1px 8px;vertical-align:middle">v3.66</span></p>
+      <p>會議記錄 ・ 待辦追蹤 ・ 每日晨報 ・ Outlook &nbsp;<span style="font-size:11px;background:#22c55e22;color:#22c55e;border:1px solid #22c55e44;border-radius:20px;padding:1px 8px;vertical-align:middle">v3.67</span></p>
     </div>
     <div class="header-right" style="display:flex;gap:8px;align-items:center">
       <div class="api-status ok" id="api-status"><i class="ti ti-check"></i> AI 已連線</div>
@@ -2051,17 +2051,21 @@ function speakChain(text){
     _voiceChainDone();
   }
 
-  // 30 秒安全守衛：避免 speakChain 長時間卡住 isTTSSpeaking
-  let _chainSafeGuard = setTimeout(()=>{
-    if(_speakChainGen !== myGen) return;
-    console.warn('[刀疤] speakChain 安全守衛觸發，強制重置');
-    // 同樣必須取消排隊中的 Chrome TTS utterance，防止延遲播放干擾麥克風
-    window.speechSynthesis.cancel();
-    _speakChainGen++;
-    _feedbackGen++;
-    if(_speakChainKeepAlive){clearInterval(_speakChainKeepAlive);_speakChainKeepAlive=null;}
-    _voiceChainDone();
-  }, 30000);
+  // 安全守衛：預設 300 秒（5分鐘），每讀完一句會重設為 60 秒，防止卡死
+  function _resetChainGuard(ms){
+    if(_chainSafeGuard) clearTimeout(_chainSafeGuard);
+    _chainSafeGuard = setTimeout(()=>{
+      if(_speakChainGen !== myGen) return;
+      console.warn('[刀疤] speakChain 安全守衛觸發，強制重置');
+      window.speechSynthesis.cancel();
+      _speakChainGen++;
+      _feedbackGen++;
+      if(_speakChainKeepAlive){clearInterval(_speakChainKeepAlive);_speakChainKeepAlive=null;}
+      _voiceChainDone();
+    }, ms||300000);
+  }
+  let _chainSafeGuard = null;
+  _resetChainGuard(300000);
 
   // 分句備援（先 Google TTS，失敗才用 Chrome TTS）
   function _runChromeFallback(){
@@ -2073,11 +2077,17 @@ function speakChain(text){
       if(idx>=chunks.length||!isAwake){ _onDone(); return; }
       const chunk = chunks[idx];
       _googleTTS(chunk, ()=>_speakChainGen===myGen, ()=>{
-        if(_speakChainGen!==myGen) return; idx++; next();
+        if(_speakChainGen!==myGen) return;
+        _resetChainGuard(60000); // 每讀完一句，守衛重設為 60 秒
+        idx++; next();
       }, ()=>{
         if(_speakChainGen!==myGen) return;
         // Google 失敗，用 Chrome TTS
-        _chromeTTSSpeak(chunk, ()=>{ if(_speakChainGen!==myGen) return; idx++; next(); });
+        _chromeTTSSpeak(chunk, ()=>{
+          if(_speakChainGen!==myGen) return;
+          _resetChainGuard(60000); // Chrome TTS 完成也重設守衛
+          idx++; next();
+        });
       });
     }
     next();
