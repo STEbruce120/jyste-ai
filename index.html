@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>鈞曜科技 AI 秘書 v3.85</title>
+<title>鈞曜科技 AI 秘書 v3.86</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
@@ -253,7 +253,7 @@ input:focus { outline: none; border-color: var(--info) !important; }
     <div class="logo"><i class="ti ti-robot"></i></div>
     <div class="header-text">
       <h1>鈞曜科技 AI 秘書</h1>
-      <p>會議記錄 ・ 待辦追蹤 ・ 每日晨報 ・ Outlook &nbsp;<span style="font-size:11px;background:#22c55e22;color:#22c55e;border:1px solid #22c55e44;border-radius:20px;padding:1px 8px;vertical-align:middle">v3.85</span></p>
+      <p>會議記錄 ・ 待辦追蹤 ・ 每日晨報 ・ Outlook &nbsp;<span style="font-size:11px;background:#22c55e22;color:#22c55e;border:1px solid #22c55e44;border-radius:20px;padding:1px 8px;vertical-align:middle">v3.86</span></p>
     </div>
     <div class="header-right" style="display:flex;gap:8px;align-items:center">
       <div class="api-status ok" id="api-status"><i class="ti ti-check"></i> AI 已連線</div>
@@ -736,7 +736,7 @@ let _voiceNewsItems=[];  // 儲存最近載入的新聞，供語音分析使用
 let _meetingDocs=[];   // 會議前上傳的參考文件 [{name,content}]
 let _lastSpokenText='';  // 記住最後一句話，供「重複」指令使用
 let _completedToday=[];  // 本次開啟後完成的待辦，供晚間簡報使用
-// ── 語音狀態機全域變數 (v3.85) ──────────────────────────────────
+// ── 語音狀態機全域變數 (v3.86) ──────────────────────────────────
 let _voiceState='off';      // 'off'|'standby'|'awake'|'processing'|'speaking'
 let _ttsGen=0;              // 遞增取消正在播放的 TTS
 // 相容舊程式碼的讀取變數（只由 _setState 寫入）
@@ -809,8 +809,36 @@ async function init(){
   renderHistory();
   initMorning();
   updateMorningStats();
-  // 頁面載入 2 秒後預熱 Chrome TTS 引擎，消除 ElevenLabs 失敗時的冷啟動延遲
+  // 頁面載入 2 秒後預熱 Chrome TTS 引擎
   setTimeout(_warmupChromeTTS, 2000);
+
+  // ── 音頻解鎖：Chrome 需要使用者互動後才允許自動播放 ──────────────
+  // 第一次點擊頁面時，靜默解鎖 AudioContext 和 SpeechSynthesis
+  let _audioUnlocked = false;
+  function _unlockAudio(){
+    if(_audioUnlocked) return;
+    _audioUnlocked = true;
+    // 1. 解鎖 Web Audio API
+    try{
+      const ctx = new (window.AudioContext||window.webkitAudioContext)();
+      const buf = ctx.createBuffer(1,1,22050);
+      const src = ctx.createBufferSource();
+      src.buffer = buf;
+      src.connect(ctx.destination);
+      src.start(0);
+    }catch(e){}
+    // 2. 解鎖 SpeechSynthesis（靜音說一個字）
+    try{
+      const u = new SpeechSynthesisUtterance(' ');
+      u.volume = 0; u.rate = 10;
+      u.onend=()=>{}; u.onerror=()=>{};
+      window.speechSynthesis.speak(u);
+    }catch(e){}
+    document.removeEventListener('click', _unlockAudio);
+    document.removeEventListener('touchstart', _unlockAudio);
+  }
+  document.addEventListener('click', _unlockAudio, {once:true});
+  document.addEventListener('touchstart', _unlockAudio, {once:true});
 }
 
 function changeApiKey(){
@@ -1926,7 +1954,7 @@ function switchTab(tab){
   document.getElementById('tab-'+tab).classList.add('active');
 }
 
-// ── 語音狀態機核心 (v3.85) ──────────────────────────────────────
+// ── 語音狀態機核心 (v3.86) ──────────────────────────────────────
 // ElevenLabs 已停用（長期 HTTP 401，只造成延遲與不穩定）
 
 const ELEVEN_VOICE_ID=''; // 已停用
@@ -2120,7 +2148,7 @@ function _warmupChromeTTS(){
   }
 }
 
-// ── 語音控制（v3.85 狀態機版）──────────────────────────────────────
+// ── 語音控制（v3.86 狀態機版）──────────────────────────────────────
 let voiceCtrlRecognition=null;
 let sleepTimeout=null;   // 相容舊程式碼（_onSpeakDone 等仍用此名）
 let _processingGuard=null; // 相容 executeVoiceCommand
