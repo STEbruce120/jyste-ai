@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>鈞曜科技 AI 秘書 v3.92</title>
+<title>鈞曜科技 AI 秘書 v3.93</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
@@ -253,7 +253,7 @@ input:focus { outline: none; border-color: var(--info) !important; }
     <div class="logo"><i class="ti ti-robot"></i></div>
     <div class="header-text">
       <h1>鈞曜科技 AI 秘書</h1>
-      <p>會議記錄 ・ 待辦追蹤 ・ 每日晨報 ・ Outlook &nbsp;<span style="font-size:11px;background:#22c55e22;color:#22c55e;border:1px solid #22c55e44;border-radius:20px;padding:1px 8px;vertical-align:middle">v3.92</span></p>
+      <p>會議記錄 ・ 待辦追蹤 ・ 每日晨報 ・ Outlook &nbsp;<span style="font-size:11px;background:#22c55e22;color:#22c55e;border:1px solid #22c55e44;border-radius:20px;padding:1px 8px;vertical-align:middle">v3.93</span></p>
     </div>
     <div class="header-right" style="display:flex;gap:8px;align-items:center">
       <div class="api-status ok" id="api-status"><i class="ti ti-check"></i> AI 已連線</div>
@@ -836,7 +836,7 @@ let _voiceNewsItems=[];  // 儲存最近載入的新聞，供語音分析使用
 let _meetingDocs=[];   // 會議前上傳的參考文件 [{name,content}]
 let _lastSpokenText='';  // 記住最後一句話，供「重複」指令使用
 let _completedToday=[];  // 本次開啟後完成的待辦，供晚間簡報使用
-// ── 語音狀態機全域變數 (v3.92) ──────────────────────────────────
+// ── 語音狀態機全域變數 (v3.93) ──────────────────────────────────
 let _voiceState='off';      // 'off'|'standby'|'awake'|'processing'|'speaking'
 let _ttsGen=0;              // 遞增取消正在播放的 TTS
 // 相容舊程式碼的讀取變數（只由 _setState 寫入）
@@ -2054,7 +2054,7 @@ function switchTab(tab){
   document.getElementById('tab-'+tab).classList.add('active');
 }
 
-// ── 語音狀態機核心 (v3.92) ──────────────────────────────────────
+// ── 語音狀態機核心 (v3.93) ──────────────────────────────────────
 // ElevenLabs 已停用（長期 HTTP 401，只造成延遲與不穩定）
 
 const ELEVEN_VOICE_ID=''; // 已停用
@@ -2482,7 +2482,7 @@ function _warmupChromeTTS(){
   }
 }
 
-// ── 語音控制（v3.92 狀態機版）──────────────────────────────────────
+// ── 語音控制（v3.93 狀態機版）──────────────────────────────────────
 let voiceCtrlRecognition=null;
 let sleepTimeout=null;   // 相容舊程式碼（_onSpeakDone 等仍用此名）
 let _processingGuard=null; // 相容 executeVoiceCommand
@@ -2540,7 +2540,7 @@ function stopVoiceControl(){
   showToast('語音控制已關閉');
 }
 
-// ── 麥克風安全重啟（v3.82 遺失，v3.92 補回）─────────────────────────
+// ── 麥克風安全重啟（v3.82 遺失，v3.93 補回）─────────────────────────
 function _restartMic(){
   if(!voiceCtrlActive||!voiceCtrlRecognition)return;
   if(isTTSSpeaking)return; // TTS 播放中，不搶音訊資源
@@ -2648,12 +2648,14 @@ function dateToSpeech(dateStr){
   if(!dateStr)return '';
   const d=new Date(dateStr+'T00:00:00');
   const weekdays=['日','一','二','三','四','五','六'];
-  const now=new Date();
-  const diff=Math.round((d-now)/(1000*60*60*24));
+  // 用午夜對午夜比較，避免下午時段把「明天00:00」誤算成不足1天
+  const todayMidnight=new Date();todayMidnight.setHours(0,0,0,0);
+  const diff=Math.round((d-todayMidnight)/(1000*60*60*24));
   const base=`${d.getMonth()+1}月${d.getDate()}號`;
   if(diff===0)return `今天 ${base}`;
   if(diff===1)return `明天 ${base}`;
   if(diff===2)return `後天 ${base}`;
+  if(diff<0)return `逾期 ${base}`;
   return `${base} 星期${weekdays[d.getDay()]}`;
 }
 
