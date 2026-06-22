@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>鈞曜科技 AI 秘書 v3.78</title>
+<title>鈞曜科技 AI 秘書 v3.79</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
@@ -253,7 +253,7 @@ input:focus { outline: none; border-color: var(--info) !important; }
     <div class="logo"><i class="ti ti-robot"></i></div>
     <div class="header-text">
       <h1>鈞曜科技 AI 秘書</h1>
-      <p>會議記錄 ・ 待辦追蹤 ・ 每日晨報 ・ Outlook &nbsp;<span style="font-size:11px;background:#22c55e22;color:#22c55e;border:1px solid #22c55e44;border-radius:20px;padding:1px 8px;vertical-align:middle">v3.78</span></p>
+      <p>會議記錄 ・ 待辦追蹤 ・ 每日晨報 ・ Outlook &nbsp;<span style="font-size:11px;background:#22c55e22;color:#22c55e;border:1px solid #22c55e44;border-radius:20px;padding:1px 8px;vertical-align:middle">v3.79</span></p>
     </div>
     <div class="header-right" style="display:flex;gap:8px;align-items:center">
       <div class="api-status ok" id="api-status"><i class="ti ti-check"></i> AI 已連線</div>
@@ -2119,25 +2119,46 @@ function _chromeTTSSpeak(text, onDone){
     const tw = voices.find(v=>v.lang==='zh-TW') || voices.find(v=>v.lang.startsWith('zh')) || null;
     if(tw) u.voice=tw;
 
-    // _once 確保 onDone 只呼叫一次（防止 onend + onerror 重複觸發）
     let _called = false;
-    function _once(){ if(_called) return; _called=true; onDone(); }
+    let _keepalive = null;
+    function _once(){
+      if(_called) return; _called=true;
+      if(_keepalive){ clearInterval(_keepalive); _keepalive=null; }
+      onDone();
+    }
 
-    // 冷啟動守衛：5 秒內若 onstart 未觸發，代表 Chrome TTS 引擎卡死
-    // 立刻取消並呼叫 onDone，避免延遲 10-20 秒後才播放（播放時麥克風會把 TTS 誤認成指令）
+    // 冷啟動守衛：10 秒內若 onstart 未觸發，代表 Chrome TTS 引擎卡死
     const _coldGuard = setTimeout(()=>{
       console.warn('[刀疤] Chrome TTS 冷啟動超時（10秒），強制取消並跳過');
-      window.speechSynthesis.cancel(); // 取消排隊中的 utterance，防止延遲播放干擾麥克風
+      window.speechSynthesis.cancel();
       _once();
     }, 10000);
 
-    u.onstart = ()=>{ clearTimeout(_coldGuard); }; // 正常啟動，清除冷啟動守衛
+    u.onstart = ()=>{
+      clearTimeout(_coldGuard);
+      // Chrome 有 ~15 秒後自動停止的 bug，每 10 秒 pause/resume 保持引擎活躍
+      _keepalive = setInterval(()=>{
+        if(window.speechSynthesis.speaking){
+          window.speechSynthesis.pause();
+          window.speechSynthesis.resume();
+        }
+      }, 10000);
+    };
     u.onend   = ()=>{ clearTimeout(_coldGuard); _once(); };
-    u.onerror = ()=>{ clearTimeout(_coldGuard); _once(); }; // 所有錯誤（含 canceled）都要清理
+    u.onerror = (e)=>{
+      // 'canceled' 是正常取消，其他才是真正錯誤
+      clearTimeout(_coldGuard);
+      _once();
+    };
     window.speechSynthesis.speak(u);
   }
+  // 若 voices 尚未載入，等待 voiceschanged；加 3 秒備用計時避免事件永不觸發
   if(window.speechSynthesis.getVoices().length === 0){
-    window.speechSynthesis.addEventListener('voiceschanged', _doSpeak, {once:true});
+    let _vFired = false;
+    const _vTimeout = setTimeout(()=>{ if(!_vFired){ _vFired=true; _doSpeak(); } }, 3000);
+    window.speechSynthesis.addEventListener('voiceschanged', ()=>{
+      if(_vFired) return; _vFired=true; clearTimeout(_vTimeout); _doSpeak();
+    }, {once:true});
   }else{
     _doSpeak();
   }
@@ -2276,10 +2297,16 @@ async function speakChain(text){
     });
   }
 
-  // Chrome TTS 包裝成 Promise
+  // Chrome TTS 包裝成 Promise（加60秒安全超時，避免 callback 遺失造成卡死）
   function _chromeTTSAsync(chunk){
     return new Promise(resolve=>{
-      _chromeTTSSpeak(chunk, ()=>resolve(true));
+      let _resolved = false;
+      const _safeTimeout = setTimeout(()=>{
+        if(!_resolved){ _resolved=true; console.warn('[刀疤] _chromeTTSAsync 60秒超時，強制繼續'); resolve(true); }
+      }, 60000);
+      _chromeTTSSpeak(chunk, ()=>{
+        if(!_resolved){ _resolved=true; clearTimeout(_safeTimeout); resolve(true); }
+      });
     });
   }
 
@@ -2411,7 +2438,7 @@ function startVoiceControl(){
   // （任何其他守衛都漏網的情況，這是最後防線）
   const _watchdog = setInterval(()=>{
     if(!voiceCtrlActive){ clearInterval(_watchdog); return; }
-    if(isTTSSpeaking && _isTTSSpeakingSetAt > 0 && Date.now()-_isTTSSpeakingSetAt > 20000){
+    if(isTTSSpeaking && _isTTSSpeakingSetAt > 0 && Date.now()-_isTTSSpeakingSetAt > 45000){
       console.warn('[刀疤] 全域看門狗觸發：isTTSSpeaking 卡死超過 20 秒，強制重置所有狀態');
       // 強制停止所有音頻
       if(_currentTTSAudio){ _currentTTSAudio.pause(); _currentTTSAudio=null; }
