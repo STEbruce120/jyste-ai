@@ -3,9 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>鈞曜科技 AI 秘書 v3.73</title>
+<title>鈞曜科技 AI 秘書 v3.74</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mammoth@1.6.0/mammoth.browser.min.js"></script>
 <style>
 :root {
   --bg: #eef2ff;
@@ -188,6 +190,18 @@ input:focus { outline: none; border-color: var(--info) !important; }
 .sch-delete:hover{color:var(--danger)}
 .sch-day-label{font-size:12px;font-weight:500;color:var(--text2);padding:6px 0 4px;border-bottom:0.5px solid var(--border);margin-bottom:4px}
 
+/* 會議參考文件 */
+.doc-drop-zone { border: 2px dashed var(--border); border-radius: var(--radius-sm); padding: 20px; text-align: center; cursor: pointer; color: var(--text2); font-size: 13px; transition: all 0.2s; }
+.doc-drop-zone:hover, .doc-drop-zone.dragover { border-color: var(--info); background: var(--info-bg); color: var(--info); }
+.doc-drop-zone i { font-size: 28px; display: block; margin-bottom: 6px; }
+.doc-item { display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: var(--bg3); border-radius: var(--radius-sm); margin-top: 8px; font-size: 13px; }
+.doc-item i { color: var(--info); flex-shrink: 0; }
+.doc-item-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.doc-item-size { font-size: 11px; color: var(--text2); flex-shrink: 0; }
+.doc-item-del { background: none; border: none; cursor: pointer; color: var(--text2); padding: 2px 4px; font-size: 15px; }
+.doc-item-del:hover { color: var(--danger); }
+.doc-loading { font-size: 12px; color: var(--info); display: flex; align-items: center; gap: 6px; margin-top: 6px; }
+
 /* Result */
 .result-box { margin-top: 1rem; background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 1rem; font-size: 14px; line-height: 1.8; white-space: pre-wrap; display: none; }
 
@@ -239,7 +253,7 @@ input:focus { outline: none; border-color: var(--info) !important; }
     <div class="logo"><i class="ti ti-robot"></i></div>
     <div class="header-text">
       <h1>鈞曜科技 AI 秘書</h1>
-      <p>會議記錄 ・ 待辦追蹤 ・ 每日晨報 ・ Outlook &nbsp;<span style="font-size:11px;background:#22c55e22;color:#22c55e;border:1px solid #22c55e44;border-radius:20px;padding:1px 8px;vertical-align:middle">v3.73</span></p>
+      <p>會議記錄 ・ 待辦追蹤 ・ 每日晨報 ・ Outlook &nbsp;<span style="font-size:11px;background:#22c55e22;color:#22c55e;border:1px solid #22c55e44;border-radius:20px;padding:1px 8px;vertical-align:middle">v3.74</span></p>
     </div>
     <div class="header-right" style="display:flex;gap:8px;align-items:center">
       <div class="api-status ok" id="api-status"><i class="ti ti-check"></i> AI 已連線</div>
@@ -382,6 +396,27 @@ input:focus { outline: none; border-color: var(--info) !important; }
 
   <!-- 會議記錄 -->
   <div id="tab-meeting" class="section">
+
+    <!-- 會議參考文件上傳 -->
+    <div class="card">
+      <div class="card-title">
+        <div class="card-title-left"><i class="ti ti-file-upload" style="color:var(--purple)"></i> 會議參考文件</div>
+        <span style="font-size:12px;color:var(--text2)">選填 · AI 整理時自動參考</span>
+      </div>
+      <div class="doc-drop-zone" id="doc-drop-zone"
+           onclick="document.getElementById('meeting-doc-input').click()"
+           ondragover="event.preventDefault();this.classList.add('dragover')"
+           ondragleave="this.classList.remove('dragover')"
+           ondrop="handleDocDrop(event)">
+        <i class="ti ti-upload"></i>
+        點擊或拖曳上傳文件（PDF、Word、TXT）
+        <div style="font-size:11px;margin-top:4px">AI 整理會議記錄時會自動參考這些文件內容</div>
+      </div>
+      <input type="file" id="meeting-doc-input" multiple accept=".pdf,.txt,.md,.docx,.doc"
+             style="display:none" onchange="handleMeetingDocUpload(this.files)">
+      <div id="meeting-docs-list"></div>
+    </div>
+
     <div class="card">
       <div class="card-title"><div class="card-title-left"><i class="ti ti-microphone"></i> 即時錄音</div></div>
       <div class="rec-area">
@@ -692,6 +727,7 @@ async function sbDelete(table,id){
 
 let todos=[], meetings=[], currentFilter='all', lastExtractedTodos=[], apiKey=localStorage.getItem('jyste_groq_key')||'';
 let _voiceNewsItems=[];  // 儲存最近載入的新聞，供語音分析使用
+let _meetingDocs=[];   // 會議前上傳的參考文件 [{name,content}]
 let _lastSpokenText='';  // 記住最後一句話，供「重複」指令使用
 let _completedToday=[];  // 本次開啟後完成的待辦，供晚間簡報使用
 let isTTSSpeaking=false; // TTS 播報期間為 true，防止辨識在段落空隙誤收自己的聲音
@@ -1201,6 +1237,88 @@ async function transcribeWithWhisper(mimeType){
 }
 
 // ── Meeting ───────────────────────────────────────
+// ── 會議參考文件上傳與文字抽取 ──────────────────────────────
+function renderMeetingDocs(){
+  const list=document.getElementById('meeting-docs-list');
+  if(!list)return;
+  if(!_meetingDocs.length){list.innerHTML='';return;}
+  list.innerHTML=_meetingDocs.map((d,i)=>`
+    <div class="doc-item">
+      <i class="ti ti-file-text"></i>
+      <span class="doc-item-name" title="${d.name}">${d.name}</span>
+      <span class="doc-item-size">${d.pages?d.pages+'頁':''}${d.words?'・約'+d.words+'字':''}</span>
+      <button class="doc-item-del" onclick="removeMeetingDoc(${i})" title="移除"><i class="ti ti-x"></i></button>
+    </div>`).join('');
+}
+
+function removeMeetingDoc(idx){
+  _meetingDocs.splice(idx,1);
+  renderMeetingDocs();
+  showToast('文件已移除');
+}
+
+function handleDocDrop(e){
+  e.preventDefault();
+  document.getElementById('doc-drop-zone').classList.remove('dragover');
+  handleMeetingDocUpload(e.dataTransfer.files);
+}
+
+async function handleMeetingDocUpload(files){
+  if(!files||!files.length)return;
+  const zone=document.getElementById('doc-drop-zone');
+  const origHTML=zone.innerHTML;
+  zone.innerHTML='<i class="ti ti-loader-2 spin" style="font-size:24px;display:block;margin-bottom:6px"></i>讀取文件中...';
+  zone.style.pointerEvents='none';
+
+  for(const file of Array.from(files)){
+    try{
+      let text='';
+      const ext=file.name.split('.').pop().toLowerCase();
+      if(ext==='pdf'){
+        text=await _extractPDF(file);
+      }else if(ext==='docx'||ext==='doc'){
+        text=await _extractDOCX(file);
+      }else{
+        text=await file.text();
+      }
+      if(!text.trim()){showToast('⚠️ '+file.name+' 無法抽取文字，請確認檔案內容');continue;}
+      const words=text.trim().split(/\s+/).length;
+      _meetingDocs.push({name:file.name,content:text.substring(0,8000),words:Math.min(words,8000)});
+    }catch(e){
+      showToast('⚠️ '+file.name+' 讀取失敗：'+e.message);
+    }
+  }
+
+  zone.innerHTML=origHTML;
+  zone.style.pointerEvents='';
+  renderMeetingDocs();
+  if(_meetingDocs.length)showToast('✅ 已上傳 '+_meetingDocs.length+' 份參考文件');
+}
+
+async function _extractPDF(file){
+  if(typeof pdfjsLib==='undefined')throw new Error('PDF 解析器未載入');
+  pdfjsLib.GlobalWorkerOptions.workerSrc=
+    'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+  const ab=await file.arrayBuffer();
+  const pdf=await pdfjsLib.getDocument({data:ab}).promise;
+  let text='';
+  const maxPages=Math.min(pdf.numPages,20);
+  for(let i=1;i<=maxPages;i++){
+    const page=await pdf.getPage(i);
+    const tc=await page.getTextContent();
+    text+=tc.items.map(it=>it.str).join(' ')+'
+';
+  }
+  return text;
+}
+
+async function _extractDOCX(file){
+  if(typeof mammoth==='undefined')throw new Error('Word 解析器未載入');
+  const ab=await file.arrayBuffer();
+  const result=await mammoth.extractRawText({arrayBuffer:ab});
+  return result.value||'';
+}
+
 async function processMeeting(){
   if(!apiKey){showToast('請先設定 API Key');document.getElementById('setup-card').style.display='block';return;}
   const input=document.getElementById('meeting-input').value.trim();
@@ -1209,7 +1327,19 @@ async function processMeeting(){
   document.getElementById('meeting-result').style.display='none';
   document.getElementById('import-row').style.display='none';
   try{
-    const res=await callGemini(`你是鈞曜科技有限公司（物料管理設備製造商，產品：垂直式/旋轉式自動倉儲）總經理的AI秘書。請整理以下會議記錄，用繁體中文回覆：
+    // 組合參考文件區塊
+    const docSection=_meetingDocs.length>0
+      ?`
+
+【會議前參考文件】（請結合以下文件內容，讓摘要和待辦更精確）
+`
+        +_meetingDocs.map((d,i)=>`--- 文件${i+1}：${d.name} ---
+${d.content}`).join('
+
+')
+      :'';
+
+    const res=await callGemini(`你是鈞曜科技有限公司（物料管理設備製造商，產品：垂直式/旋轉式自動倉儲）總經理的AI秘書。請整理以下會議記錄，用繁體中文回覆。${_meetingDocs.length>0?'本次附有'+_meetingDocs.length+'份參考文件，請結合文件內容讓摘要更完整、待辦更具體。':''}
 
 📋 會議摘要
 主題：
@@ -1229,8 +1359,8 @@ async function processMeeting(){
 ---TODOS---
 （每行一項，格式：事項||負責人||截止日期，未知寫空白）
 
-會議內容：
-${input}`);
+【會議記錄原文】
+${input}${docSection}`);
     const parts=res.split('---TODOS---');
     const display=parts[0].trim();
     lastExtractedTodos=[];
