@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>鈞曜科技 AI 秘書 v3.72</title>
+<title>鈞曜科技 AI 秘書 v3.73</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
 <style>
@@ -239,7 +239,7 @@ input:focus { outline: none; border-color: var(--info) !important; }
     <div class="logo"><i class="ti ti-robot"></i></div>
     <div class="header-text">
       <h1>鈞曜科技 AI 秘書</h1>
-      <p>會議記錄 ・ 待辦追蹤 ・ 每日晨報 ・ Outlook &nbsp;<span style="font-size:11px;background:#22c55e22;color:#22c55e;border:1px solid #22c55e44;border-radius:20px;padding:1px 8px;vertical-align:middle">v3.72</span></p>
+      <p>會議記錄 ・ 待辦追蹤 ・ 每日晨報 ・ Outlook &nbsp;<span style="font-size:11px;background:#22c55e22;color:#22c55e;border:1px solid #22c55e44;border-radius:20px;padding:1px 8px;vertical-align:middle">v3.73</span></p>
     </div>
     <div class="header-right" style="display:flex;gap:8px;align-items:center">
       <div class="api-status ok" id="api-status"><i class="ti ti-check"></i> AI 已連線</div>
@@ -299,7 +299,6 @@ input:focus { outline: none; border-color: var(--info) !important; }
     <div class="tab active" onclick="switchTab('morning')"><i class="ti ti-sun"></i>每日晨報</div>
     <div class="tab" onclick="switchTab('meeting')"><i class="ti ti-file-text"></i>會議記錄</div>
     <div class="tab" onclick="switchTab('todo')"><i class="ti ti-checkbox"></i>待辦事項</div>
-    <div class="tab" onclick="switchTab('history')"><i class="ti ti-history"></i>歷史記錄</div>
     <div class="tab" onclick="switchTab('idea')"><i class="ti ti-bulb"></i>創意捕捉</div>
   </div>
 
@@ -414,6 +413,14 @@ input:focus { outline: none; border-color: var(--info) !important; }
         <button class="btn-success" onclick="importTodos()"><i class="ti ti-download"></i> 將待辦事項匯入追蹤清單</button>
       </div>
     </div>
+
+    <!-- 歷史記錄（移入會議記錄頁） -->
+    <div class="card">
+      <div class="card-title">
+        <div class="card-title-left"><i class="ti ti-clock"></i> 歷史會議記錄</div>
+      </div>
+      <div id="history-list"></div>
+    </div>
   </div>
 
   <!-- 待辦事項 -->
@@ -450,14 +457,6 @@ input:focus { outline: none; border-color: var(--info) !important; }
         <div class="filter-btn" onclick="setFilter('done',this)">已完成</div>
       </div>
       <div id="todo-list"></div>
-    </div>
-  </div>
-
-  <!-- 歷史記錄 -->
-  <div id="tab-history" class="section">
-    <div class="card">
-      <div class="card-title"><div class="card-title-left"><i class="ti ti-clock"></i> 歷史會議記錄</div></div>
-      <div id="history-list"></div>
     </div>
   </div>
 
@@ -2669,8 +2668,8 @@ function executeVoiceCommand(cmd){
 
   // ── 歷史記錄 ──────────────────────────────────────────────────
   else if(['歷史','歷史記錄','過去','之前的記錄','舊記錄'].some(w=>cmd.includes(w))){
-    switchTab('history');
-    speakFeedback('好的 已切換到歷史記錄');
+    switchTab('meeting');
+    speakFeedback('好的 已切換到會議記錄 歷史記錄在頁面下方');
   }
 
   // ── 創意討論室 ──────────────────────────────────────────────────
