@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>鈞曜科技 AI 秘書 v3.75</title>
+<title>鈞曜科技 AI 秘書 v3.77</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
@@ -253,7 +253,7 @@ input:focus { outline: none; border-color: var(--info) !important; }
     <div class="logo"><i class="ti ti-robot"></i></div>
     <div class="header-text">
       <h1>鈞曜科技 AI 秘書</h1>
-      <p>會議記錄 ・ 待辦追蹤 ・ 每日晨報 ・ Outlook &nbsp;<span style="font-size:11px;background:#22c55e22;color:#22c55e;border:1px solid #22c55e44;border-radius:20px;padding:1px 8px;vertical-align:middle">v3.75</span></p>
+      <p>會議記錄 ・ 待辦追蹤 ・ 每日晨報 ・ Outlook &nbsp;<span style="font-size:11px;background:#22c55e22;color:#22c55e;border:1px solid #22c55e44;border-radius:20px;padding:1px 8px;vertical-align:middle">v3.77</span></p>
     </div>
     <div class="header-right" style="display:flex;gap:8px;align-items:center">
       <div class="api-status ok" id="api-status"><i class="ti ti-check"></i> AI 已連線</div>
@@ -2202,8 +2202,11 @@ function speakFeedback(text){
     _restartMic(); // 統一用安全重啟函式
     if(!isAwake) return;
     if(sleepTimeout) clearTimeout(sleepTimeout);
-    const delay = (_ideaExchangeCount>0||_ideaListening) ? 120000 : 30000;
-    sleepTimeout = setTimeout(()=>{ setAwakeMode(false); speakFeedback('我先休息一下 需要的時候叫我'); }, delay);
+    // 朗讀進行中（speakChain）不設睡眠計時器，避免中途停止
+    if(!isTTSSpeaking){
+      const delay = (_ideaExchangeCount>0||_ideaListening) ? 120000 : 30000;
+      sleepTimeout = setTimeout(()=>{ setAwakeMode(false); speakFeedback('我先休息一下 需要的時候叫我'); }, delay);
+    }
   }
 
   // 12 秒安全守衛：強制解除卡住的 isTTSSpeaking 狀態
@@ -2242,7 +2245,7 @@ function _voiceChainDone(){
   if(!isAwake) return;
   document.getElementById('voice-ctrl-status').textContent='刀疤已喚醒 請說指令 說「再見」結束對話';
   if(sleepTimeout) clearTimeout(sleepTimeout);
-  const delay = (_ideaExchangeCount>0||_ideaListening) ? 120000 : 30000;
+  const delay = (_ideaExchangeCount>0||_ideaListening) ? 120000 : 60000;
   sleepTimeout = setTimeout(()=>{
     setAwakeMode(false);
     speakFeedback('我先休息一下 需要的時候叫我');
@@ -2282,6 +2285,8 @@ function speakChain(text){
       if(_speakChainKeepAlive){clearInterval(_speakChainKeepAlive);_speakChainKeepAlive=null;}
       _voiceChainDone();
     }, ms||300000);
+    // 同步重設看門狗計時器，避免長篇朗讀被20秒看門狗誤殺
+    _isTTSSpeakingSetAt = Date.now();
   }
   let _chainSafeGuard = null;
   _resetChainGuard(300000);
@@ -2293,7 +2298,9 @@ function speakChain(text){
     let idx=0;
     function next(){
       if(_speakChainGen!==myGen) return;
-      if(idx>=chunks.length||!isAwake){ _onDone(); return; }
+      if(idx>=chunks.length){ _onDone(); return; }
+      // 注意：不在此處檢查 !isAwake，避免睡眠計時器誤停朗讀
+      // 停止朗讀請用語音指令「停」，會透過 _speakChainGen 控制
       const chunk = chunks[idx];
       _googleTTS(chunk, ()=>_speakChainGen===myGen, ()=>{
         if(_speakChainGen!==myGen) return;
@@ -2350,11 +2357,12 @@ function setAwakeMode(awake){
     document.getElementById('voice-ctrl-status').textContent='小秘已喚醒 請說指令 說「再見」結束對話';
     // 沒有任務進行中才啟動計時；有任務時等任務完成後再計時
     if(sleepTimeout)clearTimeout(sleepTimeout);
-    if(!isProcessing){
+    if(!isProcessing && !isTTSSpeaking){
+      // 朗讀中（speakChain）不設睡眠計時器
       sleepTimeout=setTimeout(()=>{
         setAwakeMode(false);
         speakFeedback('我先休息一下 需要的時候叫我');
-      },30000);
+      },60000);
     }
   }else{
     // 待機狀態：藍色
