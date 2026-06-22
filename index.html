@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>鈞曜科技 AI 秘書 v3.86</title>
+<title>鈞曜科技 AI 秘書 v3.87</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
@@ -253,7 +253,7 @@ input:focus { outline: none; border-color: var(--info) !important; }
     <div class="logo"><i class="ti ti-robot"></i></div>
     <div class="header-text">
       <h1>鈞曜科技 AI 秘書</h1>
-      <p>會議記錄 ・ 待辦追蹤 ・ 每日晨報 ・ Outlook &nbsp;<span style="font-size:11px;background:#22c55e22;color:#22c55e;border:1px solid #22c55e44;border-radius:20px;padding:1px 8px;vertical-align:middle">v3.86</span></p>
+      <p>會議記錄 ・ 待辦追蹤 ・ 每日晨報 ・ Outlook &nbsp;<span style="font-size:11px;background:#22c55e22;color:#22c55e;border:1px solid #22c55e44;border-radius:20px;padding:1px 8px;vertical-align:middle">v3.87</span></p>
     </div>
     <div class="header-right" style="display:flex;gap:8px;align-items:center">
       <div class="api-status ok" id="api-status"><i class="ti ti-check"></i> AI 已連線</div>
@@ -662,8 +662,8 @@ function setupRecognitionHandlers(){
         _setState('awake');
         isProcessing=true;
         const greets=['我在 bruce哥 請說','在的 bruce哥 有什麼事','隨時候命 bruce哥'];
-        // 150ms 緩衝：讓 Chrome 處理完 cancel 後再開始新的 TTS
-        setTimeout(()=>_speak(greets[Math.floor(Math.random()*greets.length)]), 150);
+        // 用 _speakNow 直接走 Chrome TTS，不受 autoplay 政策影響
+        setTimeout(()=>_speakNow(greets[Math.floor(Math.random()*greets.length)]), 100);
       }
       return;
     }
@@ -736,7 +736,7 @@ let _voiceNewsItems=[];  // 儲存最近載入的新聞，供語音分析使用
 let _meetingDocs=[];   // 會議前上傳的參考文件 [{name,content}]
 let _lastSpokenText='';  // 記住最後一句話，供「重複」指令使用
 let _completedToday=[];  // 本次開啟後完成的待辦，供晚間簡報使用
-// ── 語音狀態機全域變數 (v3.86) ──────────────────────────────────
+// ── 語音狀態機全域變數 (v3.87) ──────────────────────────────────
 let _voiceState='off';      // 'off'|'standby'|'awake'|'processing'|'speaking'
 let _ttsGen=0;              // 遞增取消正在播放的 TTS
 // 相容舊程式碼的讀取變數（只由 _setState 寫入）
@@ -1954,7 +1954,7 @@ function switchTab(tab){
   document.getElementById('tab-'+tab).classList.add('active');
 }
 
-// ── 語音狀態機核心 (v3.86) ──────────────────────────────────────
+// ── 語音狀態機核心 (v3.87) ──────────────────────────────────────
 // ElevenLabs 已停用（長期 HTTP 401，只造成延遲與不穩定）
 
 const ELEVEN_VOICE_ID=''; // 已停用
@@ -1996,6 +1996,33 @@ function _cancelTTS(){
   _ttsGen++;
   if(_currentTTSAudio){try{_currentTTSAudio.pause();}catch(e){}_currentTTSAudio=null;}
   window.speechSynthesis.cancel();
+}
+
+// ── 即時回應朗讀（短句，直接用 Chrome TTS，不受 autoplay 政策影響）──
+function _speakNow(text){
+  if(!text) return;
+  _lastSpokenText = text;
+  isTTSSpeaking = true;
+  window.speechSynthesis.cancel();
+  const voices = window.speechSynthesis.getVoices();
+  const u = new SpeechSynthesisUtterance(preprocessTTS(text));
+  u.lang='zh-TW'; u.rate=1.15; u.pitch=1.0; u.volume=1.0;
+  const tw = voices.find(v=>v.lang==='zh-TW') || voices.find(v=>v.lang.startsWith('zh')) || null;
+  if(tw) u.voice=tw;
+  let _done=false;
+  const _guard=setTimeout(()=>{ if(!_done){_done=true; _onSpeakNowDone();} }, 8000);
+  u.onend  = ()=>{ if(!_done){_done=true; clearTimeout(_guard); _onSpeakNowDone();} };
+  u.onerror= ()=>{ if(!_done){_done=true; clearTimeout(_guard); _onSpeakNowDone();} };
+  window.speechSynthesis.speak(u);
+}
+function _onSpeakNowDone(){
+  isTTSSpeaking=false;
+  isProcessing=false;
+  if(!voiceCtrlActive) return;
+  setTimeout(()=>_restartMic(), 300);
+  if(!isAwake) return;
+  if(sleepTimeout) clearTimeout(sleepTimeout);
+  sleepTimeout=setTimeout(()=>{ _setState('standby'); _speak('我先休息一下 需要的時候叫我'); }, 60000);
 }
 
 // ── 核心朗讀（取代 speakFeedback + speakChain）────────────────────
@@ -2045,7 +2072,7 @@ function _onSpeakDone(){
 // ── 相容層：外部呼叫 speakFeedback/speakChain 仍可運作 ────────────
 function speakFeedback(text){
   if(!isAwake&&text!=='我先休息一下 需要的時候叫我')return;
-  _speak(text);
+  _speakNow(text); // 短句回饋用 Chrome TTS，確保即時播放
 }
 async function speakChain(text){await _speak(text);}
 function _voiceChainDone(){_onSpeakDone();}
@@ -2148,7 +2175,7 @@ function _warmupChromeTTS(){
   }
 }
 
-// ── 語音控制（v3.86 狀態機版）──────────────────────────────────────
+// ── 語音控制（v3.87 狀態機版）──────────────────────────────────────
 let voiceCtrlRecognition=null;
 let sleepTimeout=null;   // 相容舊程式碼（_onSpeakDone 等仍用此名）
 let _processingGuard=null; // 相容 executeVoiceCommand
