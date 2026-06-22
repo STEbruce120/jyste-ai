@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>鈞曜科技 AI 秘書 v3.87</title>
+<title>鈞曜科技 AI 秘書 v3.88</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
@@ -253,7 +253,7 @@ input:focus { outline: none; border-color: var(--info) !important; }
     <div class="logo"><i class="ti ti-robot"></i></div>
     <div class="header-text">
       <h1>鈞曜科技 AI 秘書</h1>
-      <p>會議記錄 ・ 待辦追蹤 ・ 每日晨報 ・ Outlook &nbsp;<span style="font-size:11px;background:#22c55e22;color:#22c55e;border:1px solid #22c55e44;border-radius:20px;padding:1px 8px;vertical-align:middle">v3.87</span></p>
+      <p>會議記錄 ・ 待辦追蹤 ・ 每日晨報 ・ Outlook &nbsp;<span style="font-size:11px;background:#22c55e22;color:#22c55e;border:1px solid #22c55e44;border-radius:20px;padding:1px 8px;vertical-align:middle">v3.88</span></p>
     </div>
     <div class="header-right" style="display:flex;gap:8px;align-items:center">
       <div class="api-status ok" id="api-status"><i class="ti ti-check"></i> AI 已連線</div>
@@ -736,7 +736,7 @@ let _voiceNewsItems=[];  // 儲存最近載入的新聞，供語音分析使用
 let _meetingDocs=[];   // 會議前上傳的參考文件 [{name,content}]
 let _lastSpokenText='';  // 記住最後一句話，供「重複」指令使用
 let _completedToday=[];  // 本次開啟後完成的待辦，供晚間簡報使用
-// ── 語音狀態機全域變數 (v3.87) ──────────────────────────────────
+// ── 語音狀態機全域變數 (v3.88) ──────────────────────────────────
 let _voiceState='off';      // 'off'|'standby'|'awake'|'processing'|'speaking'
 let _ttsGen=0;              // 遞增取消正在播放的 TTS
 // 相容舊程式碼的讀取變數（只由 _setState 寫入）
@@ -1954,7 +1954,7 @@ function switchTab(tab){
   document.getElementById('tab-'+tab).classList.add('active');
 }
 
-// ── 語音狀態機核心 (v3.87) ──────────────────────────────────────
+// ── 語音狀態機核心 (v3.88) ──────────────────────────────────────
 // ElevenLabs 已停用（長期 HTTP 401，只造成延遲與不穩定）
 
 const ELEVEN_VOICE_ID=''; // 已停用
@@ -1996,6 +1996,179 @@ function _cancelTTS(){
   _ttsGen++;
   if(_currentTTSAudio){try{_currentTTSAudio.pause();}catch(e){}_currentTTSAudio=null;}
   window.speechSynthesis.cancel();
+}
+
+// ── 每日簡報文字組合 ──────────────────────────────────────────────
+function buildDailyBriefing(){
+  const now=new Date();
+  const weekdays=['日','一','二','三','四','五','六'];
+  const month=now.getMonth()+1; const day=now.getDate();
+  const weekday=weekdays[now.getDay()]; const h=now.getHours();
+  const pending=todos.filter(t=>!t.done).length;
+  const urgent=todos.filter(t=>{
+    if(t.done||!t.date)return false;
+    const d=daysUntil(t.date); return d!==null&&d<=3&&d>=0;
+  });
+  const overdue=todos.filter(t=>{
+    if(t.done||!t.date)return false; return daysUntil(t.date)<0;
+  });
+  const morningOpeners=[
+    `bruce哥早安 今天${month}月${day}號星期${weekday} 幫你看一下今天的狀況`,
+    `早安 bruce哥 ${month}月${day}號星期${weekday} 新的一天開始了`,
+    `早安 bruce哥 今天${month}月${day}號星期${weekday} 來報告一下今天的重點`
+  ];
+  const afternoonOpeners=[
+    `bruce哥午安 ${month}月${day}號下午 幫你更新一下進度`,
+    `午安 bruce哥 ${month}月${day}號 看看下午有什麼要處理的`
+  ];
+  const eveningOpeners=[
+    `bruce哥辛苦了 ${month}月${day}號晚上 看看今天還有什麼沒處理的`,
+    `晚安 bruce哥 ${month}月${day}號 今天快結束了來做個收尾`
+  ];
+  let openers=h<12?morningOpeners:h<18?afternoonOpeners:eveningOpeners;
+  let text=openers[Math.floor(Math.random()*openers.length)];
+  if(overdue.length>0&&urgent.length>0){
+    text+=` 要提醒你 有${overdue.length}件事已經過期`;
+    if(overdue.length<=2)text+=` 是${overdue.map(t=>t.text).join('和')}`;
+    text+=` 另外還有${urgent.length}件快到期 請盡快安排處理`;
+  }else if(overdue.length>0){
+    text+=` 要提醒你 有${overdue.length}件事已經過了截止日期`;
+    if(overdue.length<=2)text+=` 是${overdue.map(t=>t.text).join('和')}`;
+    text+=` 請盡快處理`;
+  }else if(urgent.length>0){
+    text+=` 提醒你 有${urgent.length}件事快到期了`;
+    urgent.slice(0,2).forEach(t=>{
+      const d=daysUntil(t.date);
+      const when=d===0?'今天到期':d===1?'明天到期':'還有'+d+'天到期';
+      text+=` ${t.text}${when}`;
+    });
+    text+=` 記得安排時間處理`;
+  }else if(pending>0){
+    text+=` 目前還有${pending}件待辦事項 進度都在掌控中 繼續加油`;
+  }else{
+    const freeTexts=[
+      ` 目前沒有任何待辦事項 今天可以輕鬆一點`,
+      ` 今天的事情都清完了 難得清閒好好把握`,
+      ` 目前一切清空 保持這個好狀態`
+    ];
+    text+=freeTexts[Math.floor(Math.random()*freeTexts.length)];
+  }
+  const endings=[
+    ' 有任何需要隨時告訴我',' 今天也請多保重 有事找我',
+    ' 工作順利 有需要我隨時在',' 記得適時休息 有事直接說'
+  ];
+  text+=endings[Math.floor(Math.random()*endings.length)];
+  return text;
+}
+
+// ── 晚間收尾簡報 ──────────────────────────────────────────────────
+function speakEveningBriefing(){
+  const now=new Date();
+  const weekdays=['日','一','二','三','四','五','六'];
+  const month=now.getMonth()+1; const day=now.getDate();
+  const weekday=weekdays[now.getDay()];
+  const openers=[
+    `bruce哥辛苦了 今天${month}月${day}號星期${weekday} 來幫你做個收尾`,
+    `收工了 bruce哥 ${month}月${day}號星期${weekday} 幫你整理一下今天的狀況`
+  ];
+  let text=openers[Math.floor(Math.random()*openers.length)];
+  if(_completedToday.length>0){
+    text+=` 今天完成了${_completedToday.length}件事`;
+    if(_completedToday.length<=3)text+=` 包括${_completedToday.map(t=>t.text).join('、')}`;
+    text+=' 很不錯';
+  }else{
+    text+=' 今天沒有從這裡完成待辦事項';
+  }
+  const pending=todos.filter(t=>!t.done);
+  const overdue=pending.filter(t=>{if(!t.date)return false;return daysUntil(t.date)<0;});
+  const urgent=pending.filter(t=>{if(!t.date)return false;const d=daysUntil(t.date);return d!==null&&d>=0&&d<=3;});
+  if(overdue.length>0){
+    text+=` 另外提醒你 有${overdue.length}件事已經過了截止日期`;
+    if(overdue.length<=2)text+=` 是${overdue.map(t=>t.text).join('和')}`;
+    text+=' 明天記得優先處理';
+  }else if(urgent.length>0){
+    text+=` 還有${urgent.length}件事快到期了`;
+    urgent.slice(0,2).forEach(t=>{
+      const d=daysUntil(t.date);
+      const when=d===0?'今天到期':d===1?'明天到期':'還有'+d+'天';
+      text+=` ${t.text}${when}`;
+    });
+    text+=' 記得安排時間';
+  }else if(pending.length>0){
+    text+=` 還有${pending.length}件待辦 明天繼續加油`;
+  }else{
+    text+=' 今天的事情全部清完了 難得清閒 好好休息';
+  }
+  const endings=[' 好好休息 明天見',' 今天辛苦了 早點休息',' 明天見 bruce哥 好好休息'];
+  text+=endings[Math.floor(Math.random()*endings.length)];
+  _speak(text);
+}
+
+// ── 每日簡報播報控制 ──────────────────────────────────────────────
+function toggleSpeak(){
+  if(isSpeaking){ stopSpeak(); }else{ startSpeak(); }
+}
+
+async function startSpeak(){
+  const text=buildDailyBriefing();
+  const el=document.getElementById('speak-text');
+  if(el){el.style.display='block';el.textContent=text;}
+  isSpeaking=true;
+  _setState('speaking');
+  const btn=document.getElementById('speak-btn');
+  if(btn){btn.style.background='#ef4444';btn.innerHTML='<i class="ti ti-player-pause"></i> 播報中';}
+  if(sleepTimeout){clearTimeout(sleepTimeout);sleepTimeout=null;}
+  window.speechSynthesis.cancel();
+  const ttsText=preprocessTTS(text);
+  const speed=parseFloat((document.getElementById('voice-speed')||{}).value)||1.3;
+  function getVoice(){
+    const v=window.speechSynthesis.getVoices();
+    return v.find(x=>x.lang==='zh-TW')||v.find(x=>x.lang.startsWith('zh'))||null;
+  }
+  function doSpeak(){
+    const u=new SpeechSynthesisUtterance(ttsText);
+    u.lang='zh-TW'; u.rate=speed; u.pitch=1.05;
+    const tw=getVoice(); if(tw)u.voice=tw;
+    if(speakKeepAlive)clearInterval(speakKeepAlive);
+    speakKeepAlive=setInterval(()=>{
+      if(!isSpeaking){clearInterval(speakKeepAlive);speakKeepAlive=null;return;}
+      window.speechSynthesis.pause(); window.speechSynthesis.resume();
+    },5000);
+    u.onend=u.onerror=()=>{
+      if(speakKeepAlive){clearInterval(speakKeepAlive);speakKeepAlive=null;}
+      isSpeaking=false;
+      if(btn){btn.style.background='#22c55e';btn.innerHTML='<i class="ti ti-player-play"></i> 播報';}
+      if(isAwake&&voiceCtrlActive){
+        _setState('awake');
+        if(sleepTimeout)clearTimeout(sleepTimeout);
+        sleepTimeout=setTimeout(()=>{_setState('standby');_speak('我先休息一下 需要的時候叫我');},60000);
+      }else{
+        _setState(voiceCtrlActive?'standby':'off');
+      }
+      if(voiceCtrlActive)setTimeout(()=>_restartMic(),400);
+    };
+    window.speechSynthesis.speak(u);
+  }
+  if(window.speechSynthesis.getVoices().length===0){
+    window.speechSynthesis.onvoiceschanged=doSpeak;
+  }else{
+    doSpeak();
+  }
+}
+
+function stopSpeak(){
+  if(speakKeepAlive){clearInterval(speakKeepAlive);speakKeepAlive=null;}
+  window.speechSynthesis.cancel();
+  if(_currentTTSAudio){try{_currentTTSAudio.pause();}catch(e){}_currentTTSAudio=null;}
+  isSpeaking=false;
+  const btn=document.getElementById('speak-btn');
+  if(btn){btn.style.background='#22c55e';btn.innerHTML='<i class="ti ti-player-play"></i> 播報';}
+  if(isAwake&&voiceCtrlActive){
+    _setState('awake');
+  }else{
+    _setState(voiceCtrlActive?'standby':'off');
+  }
+  if(voiceCtrlActive)setTimeout(()=>_restartMic(),400);
 }
 
 // ── 即時回應朗讀（短句，直接用 Chrome TTS，不受 autoplay 政策影響）──
@@ -2175,7 +2348,7 @@ function _warmupChromeTTS(){
   }
 }
 
-// ── 語音控制（v3.87 狀態機版）──────────────────────────────────────
+// ── 語音控制（v3.88 狀態機版）──────────────────────────────────────
 let voiceCtrlRecognition=null;
 let sleepTimeout=null;   // 相容舊程式碼（_onSpeakDone 等仍用此名）
 let _processingGuard=null; // 相容 executeVoiceCommand
