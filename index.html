@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>鈞曜科技 AI 秘書 v3.70</title>
+<title>鈞曜科技 AI 秘書 v3.71</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
 <style>
@@ -212,7 +212,7 @@ input:focus { outline: none; border-color: var(--info) !important; }
     <div class="logo"><i class="ti ti-robot"></i></div>
     <div class="header-text">
       <h1>鈞曜科技 AI 秘書</h1>
-      <p>會議記錄 ・ 待辦追蹤 ・ 每日晨報 ・ Outlook &nbsp;<span style="font-size:11px;background:#22c55e22;color:#22c55e;border:1px solid #22c55e44;border-radius:20px;padding:1px 8px;vertical-align:middle">v3.70</span></p>
+      <p>會議記錄 ・ 待辦追蹤 ・ 每日晨報 ・ Outlook &nbsp;<span style="font-size:11px;background:#22c55e22;color:#22c55e;border:1px solid #22c55e44;border-radius:20px;padding:1px 8px;vertical-align:middle">v3.71</span></p>
     </div>
     <div class="header-right" style="display:flex;gap:8px;align-items:center">
       <div class="api-status ok" id="api-status"><i class="ti ti-check"></i> AI 已連線</div>
@@ -713,17 +713,26 @@ async function init(){
   // API Key 已內建，無需手動設定
   apiKey=localStorage.getItem('jyste_groq_key')||'';
   try{localStorage.setItem(STORAGE_KEY_API,apiKey);}catch(e){}
-  // 從 Supabase 載入資料
+  // 第一步：先從本機讀取（快速，無需網路）
+  try{
+    todos=JSON.parse(localStorage.getItem(STORAGE_KEY_TODOS)||'[]');
+    meetings=JSON.parse(localStorage.getItem(STORAGE_KEY_MEETINGS)||'[]');
+  }catch(e){todos=[];meetings=[];}
+  // 第二步：嘗試從 Supabase 合併（Supabase 有的以雲端為準，本機獨有的保留）
   try{
     const [t,m]=await Promise.all([sbGet('todos'),sbGet('meetings')]);
-    todos=t||[];
-    meetings=m||[];
+    const sbTodos=t||[], sbMeetings=m||[];
+    const tm=new Map(todos.map(x=>[String(x.id),x]));
+    sbTodos.forEach(x=>tm.set(String(x.id),x));
+    todos=[...tm.values()];
+    const mm=new Map(meetings.map(x=>[String(x.id),x]));
+    sbMeetings.forEach(x=>mm.set(String(x.id),x));
+    meetings=[...mm.values()];
+    // 合併後存回本機，確保下次離線時資料完整
+    try{localStorage.setItem(STORAGE_KEY_TODOS,JSON.stringify(todos));
+        localStorage.setItem(STORAGE_KEY_MEETINGS,JSON.stringify(meetings));}catch(e){}
   }catch(e){
-    // 備援：使用本機資料
-    try{
-      todos=JSON.parse(localStorage.getItem(STORAGE_KEY_TODOS)||'[]');
-      meetings=JSON.parse(localStorage.getItem(STORAGE_KEY_MEETINGS)||'[]');
-    }catch(e2){todos=[];meetings=[];}
+    // Supabase 連線失敗，繼續使用本機資料（已在第一步載入）
   }
   updateApiStatus();
   checkNotifPermission();
