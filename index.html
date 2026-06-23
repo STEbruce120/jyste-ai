@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>鈞曜科技 AI 秘書 v4.00</title>
+<title>鈞曜科技 AI 秘書 v4.01</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
@@ -253,7 +253,7 @@ input:focus { outline: none; border-color: var(--info) !important; }
     <div class="logo"><i class="ti ti-robot"></i></div>
     <div class="header-text">
       <h1>鈞曜科技 AI 秘書</h1>
-      <p>會議記錄 ・ 待辦追蹤 ・ 每日晨報 ・ Outlook &nbsp;<span style="font-size:11px;background:#22c55e22;color:#22c55e;border:1px solid #22c55e44;border-radius:20px;padding:1px 8px;vertical-align:middle">v4.00</span></p>
+      <p>會議記錄 ・ 待辦追蹤 ・ 每日晨報 ・ Outlook &nbsp;<span style="font-size:11px;background:#22c55e22;color:#22c55e;border:1px solid #22c55e44;border-radius:20px;padding:1px 8px;vertical-align:middle">v4.01</span></p>
     </div>
     <div class="header-right" style="display:flex;gap:8px;align-items:center">
       <div class="api-status ok" id="api-status"><i class="ti ti-check"></i> AI 已連線</div>
@@ -849,7 +849,7 @@ let _voiceNewsItems=[];  // 儲存最近載入的新聞，供語音分析使用
 let _meetingDocs=[];   // 會議前上傳的參考文件 [{name,content}]
 let _lastSpokenText='';  // 記住最後一句話，供「重複」指令使用
 let _completedToday=[];  // 本次開啟後完成的待辦，供晚間簡報使用
-// ── 語音狀態機全域變數 (v4.00) ──────────────────────────────────
+// ── 語音狀態機全域變數 (v4.01) ──────────────────────────────────
 let _voiceState='off';      // 'off'|'standby'|'awake'|'processing'|'speaking'
 let _lastMicStart=0;        // 防止短時間大量 start() 被 Chrome 封鎖
 let _micRestartScheduled=false; // 防止 onend 和 _onSpeakDone 同時重啟
@@ -2089,7 +2089,7 @@ function switchTab(tab){
   document.getElementById('tab-'+tab).classList.add('active');
 }
 
-// ── 語音狀態機核心 (v4.00) ──────────────────────────────────────
+// ── 語音狀態機核心 (v4.01) ──────────────────────────────────────
 // ElevenLabs 已停用（長期 HTTP 401，只造成延遲與不穩定）
 
 const ELEVEN_VOICE_ID=''; // 已停用
@@ -2336,19 +2336,13 @@ function _speakNow(text){
 function _onSpeakNowDone(){
   isTTSSpeaking=false;
   isProcessing=false;
+  _ttsWasCancelled=false;
   if(!voiceCtrlActive) return;
-  if(_ttsWasCancelled && _micRunning && voiceCtrlRecognition){
-    // TTS 曾被強制 cancel：Chrome 可能讓 session 殭屍化，主動重建
-    _ttsWasCancelled=false;
+  // TTS 播完後主動重啟辨識 session，防止多次 TTS 後 WebSocket 連線殭屍化
+  if(voiceCtrlRecognition){
     _micRunning=false;
     try{ voiceCtrlRecognition.stop(); }catch(e){}
-    // onend 會自動觸發重啟（500ms 後）
-  } else if(!_micRunning){
-    _ttsWasCancelled=false;
-    _micRestartScheduled=true;
-    setTimeout(()=>_restartMic(), 600);
-  } else {
-    _ttsWasCancelled=false;
+    // onend 500ms 後自動重啟
   }
   if(!isAwake) return;
   _updateVoiceUI(); // 刷新狀態文字
@@ -2392,17 +2386,12 @@ async function _speak(text){
 function _onSpeakDone(){
   isTTSSpeaking=false;
   isProcessing=false;
+  _ttsWasCancelled=false;
   if(!voiceCtrlActive)return;
-  if(_ttsWasCancelled && _micRunning && voiceCtrlRecognition){
-    _ttsWasCancelled=false;
+  // TTS 播完後主動重啟辨識 session，防止 WebSocket 連線殭屍化
+  if(voiceCtrlRecognition){
     _micRunning=false;
     try{ voiceCtrlRecognition.stop(); }catch(e){}
-  } else if(!_micRunning){
-    _ttsWasCancelled=false;
-    _micRestartScheduled=true;
-    setTimeout(()=>_restartMic(),600);
-  } else {
-    _ttsWasCancelled=false;
   }
   if(!isAwake)return;
   _updateVoiceUI(); // 刷新狀態文字，清除「查詢中...」等暫時提示
@@ -2556,7 +2545,7 @@ function _warmupChromeTTS(){
   }
 }
 
-// ── 語音控制（v4.00 狀態機版）──────────────────────────────────────
+// ── 語音控制（v4.01 狀態機版）──────────────────────────────────────
 let voiceCtrlRecognition=null;
 let sleepTimeout=null;   // 相容舊程式碼（_onSpeakDone 等仍用此名）
 let _processingGuard=null; // 相容 executeVoiceCommand
