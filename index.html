@@ -3324,4 +3324,16 @@ async function downloadIdeaPPTX(){
     end.background = {color:'1a1a2e'};
     end.addText('謝謝聆聽',{x:0.5,y:2.0,w:9,h:1.0,fontSize:32,bold:true,color:'f59e0b',align:'center'});
     end.addText('鈞曜科技有限公司',{x:0.5,y:3.2,w:9,h:0.6,fontSize:18,color:'e2e8f0',align:'center'});
-    await pptx.writeFile({fileName:(data.title||'創意提案')
+    await pptx.writeFile({fileName:(data.title||'創意提案')+'.pptx'});
+    showToast('✅ 簡報下載完成！');
+  }catch(err){
+    console.error('[刀疤] PPTX 下載失敗：',err);
+    showToast('⚠️ 簡報下載失敗，請重試');
+  }
+}
+
+// ── 頁面初始化入口 ─────────────────────────────────────────────
+init();
+</script>
+</body>
+</html>
