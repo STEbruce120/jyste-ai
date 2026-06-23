@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>鈞曜科技 AI 秘書 v3.97</title>
+<title>鈞曜科技 AI 秘書 v3.98</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
@@ -253,7 +253,7 @@ input:focus { outline: none; border-color: var(--info) !important; }
     <div class="logo"><i class="ti ti-robot"></i></div>
     <div class="header-text">
       <h1>鈞曜科技 AI 秘書</h1>
-      <p>會議記錄 ・ 待辦追蹤 ・ 每日晨報 ・ Outlook &nbsp;<span style="font-size:11px;background:#22c55e22;color:#22c55e;border:1px solid #22c55e44;border-radius:20px;padding:1px 8px;vertical-align:middle">v3.97</span></p>
+      <p>會議記錄 ・ 待辦追蹤 ・ 每日晨報 ・ Outlook &nbsp;<span style="font-size:11px;background:#22c55e22;color:#22c55e;border:1px solid #22c55e44;border-radius:20px;padding:1px 8px;vertical-align:middle">v3.98</span></p>
     </div>
     <div class="header-right" style="display:flex;gap:8px;align-items:center">
       <div class="api-status ok" id="api-status"><i class="ti ti-check"></i> AI 已連線</div>
@@ -843,7 +843,7 @@ let _voiceNewsItems=[];  // 儲存最近載入的新聞，供語音分析使用
 let _meetingDocs=[];   // 會議前上傳的參考文件 [{name,content}]
 let _lastSpokenText='';  // 記住最後一句話，供「重複」指令使用
 let _completedToday=[];  // 本次開啟後完成的待辦，供晚間簡報使用
-// ── 語音狀態機全域變數 (v3.97) ──────────────────────────────────
+// ── 語音狀態機全域變數 (v3.98) ──────────────────────────────────
 let _voiceState='off';      // 'off'|'standby'|'awake'|'processing'|'speaking'
 let _lastMicStart=0;        // 防止短時間大量 start() 被 Chrome 封鎖
 let _micRestartScheduled=false; // 防止 onend 和 _onSpeakDone 同時重啟
@@ -2082,7 +2082,7 @@ function switchTab(tab){
   document.getElementById('tab-'+tab).classList.add('active');
 }
 
-// ── 語音狀態機核心 (v3.97) ──────────────────────────────────────
+// ── 語音狀態機核心 (v3.98) ──────────────────────────────────────
 // ElevenLabs 已停用（長期 HTTP 401，只造成延遲與不穩定）
 
 const ELEVEN_VOICE_ID=''; // 已停用
@@ -2534,7 +2534,7 @@ function _warmupChromeTTS(){
   }
 }
 
-// ── 語音控制（v3.97 狀態機版）──────────────────────────────────────
+// ── 語音控制（v3.98 狀態機版）──────────────────────────────────────
 let voiceCtrlRecognition=null;
 let sleepTimeout=null;   // 相容舊程式碼（_onSpeakDone 等仍用此名）
 let _processingGuard=null; // 相容 executeVoiceCommand
@@ -2564,6 +2564,11 @@ function startVoiceControl(){
     showToast('請使用 Chrome 瀏覽器才能使用語音控制');
     return;
   }
+  // 重置所有跨 session 的狀態，避免上次卡住的殘留值影響新一次開啟
+  _micErrorCount=0;
+  _micRunning=false;
+  _micRestartScheduled=false;
+  _lastMicStart=0;
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
   voiceCtrlRecognition=new SR();
   voiceCtrlRecognition.lang='zh-TW';
@@ -3319,8 +3324,4 @@ async function downloadIdeaPPTX(){
     end.background = {color:'1a1a2e'};
     end.addText('謝謝聆聽',{x:0.5,y:2.0,w:9,h:1.0,fontSize:32,bold:true,color:'f59e0b',align:'center'});
     end.addText('鈞曜科技有限公司',{x:0.5,y:3.2,w:9,h:0.6,fontSize:18,color:'e2e8f0',align:'center'});
-    await pptx.writeFile({fileName:(data.title||'創意提案')+'.pptx'});
-    showToast('✅ 簡報下載完成！');
-  }catch(err){
-    console.error('[刀疤] PPTX 下載失敗：',err);
-    showToast('⚠️ 簡報下載失敗，請重試');
+    await pptx.writeFile({fileName:(data.title||'創意提案')
